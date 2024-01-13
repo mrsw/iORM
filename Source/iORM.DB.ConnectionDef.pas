@@ -188,6 +188,7 @@ type
     // Properties
     property AsDefault;
     property AutoCreateDB;
+    property Collation;
     property Database;
     property DatabaseStdFolder;
     property Encrypt;
@@ -249,6 +250,7 @@ type
     property AsDefault;
     property AutoCreateDB;
     property CharSet;
+    property Collation;
     property Database;
     property DatabaseStdFolder;
     property Password;
