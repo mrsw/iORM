@@ -72,7 +72,6 @@ type
     FOnAfterRegister: TNotifyEvent;
     FOnBeforeRegister: TNotifyEvent;
     // Fields
-    FConnectionDef: IIoConnectionDef;
     FAsDefault: Boolean;
     FIsRegistered: Boolean;
     FPersistent: Boolean;
@@ -81,7 +80,6 @@ type
   protected
     procedure DoAfterRegister;
     procedure DoBeforeRegister;
-    function GetConnectionDef: IIoConnectionDef; virtual; abstract;
     procedure InitConnectionDef; virtual;
     procedure Loaded; override;
   public
@@ -90,7 +88,6 @@ type
     procedure RegisterConnectionDef; virtual;
     // Properties
     property AsDefault: Boolean read FAsDefault write SetAsDefault;
-    property ConnectionDef: IIoConnectionDef read FConnectionDef;
     property IsRegistered: Boolean read FIsRegistered;
     property Persistent: Boolean read FPersistent write FPersistent;
   published
@@ -109,6 +106,7 @@ type
     // Fields
     FAutoCreateDBProps: TioDBBuilderProperty;
     FCharSet: String;
+    FConnectionDef: IIoConnectionDef;
     FDatabase: String;
     FDatabaseStdFolder: TioDBStdFolder;
     FEncrypt: String;
@@ -119,13 +117,14 @@ type
     FPort: Integer;
     FProtocol: TioProtocol;
     FServer: String;
-    FSQLDialect: TioSQLDialect;
     FUserName: String;
-  private
     FCollation: String;
+    FQuotedIdentifiers: boolean;
   protected
     function DBBuilder: IioDBBuilderEngine; virtual;
     function GetFullPathDatabase: string;
+    function GetConnectionDef: IIoConnectionDef; virtual; abstract;
+    procedure InitConnectionDef; override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -137,9 +136,11 @@ type
     property AutoCreateDB: TioDBBuilderProperty read FAutoCreateDBProps write FAutoCreateDBProps;
     property CharSet: String read FCharSet write FCharSet;
     property Collation: String read FCollation write FCollation;
+    property ConnectionDef: IIoConnectionDef read FConnectionDef;
     property Database: String read FDatabase write FDatabase;
     property DatabaseStdFolder: TioDBStdFolder read FDatabaseStdFolder write FDatabaseStdFolder;
     property Encrypt: String read FEncrypt write FEncrypt;
+    property QuotedIdentifiers: boolean read FQuotedIdentifiers write FQuotedIdentifiers;
     property NewPassword: String read FNewPassword write FNewPassword;
     property OSAuthent: TioOSAuthent read FOSAuthent write FOSAuthent;
     property Password: String read FPassword write FPassword;
@@ -147,7 +148,6 @@ type
     property Port: Integer read FPort write FPort;
     property Protocol: TioProtocol read FProtocol write FProtocol;
     property Server: String read FServer write FServer;
-    property SQLDialect: TioSQLDialect read FSQLDialect write FSQLDialect;
     property UserName: String read FUserName write FUserName;
     // Events
     property OnAfterCreateOrAlterDB: TioDBBuilderAfterCreateOrAlterDBEvent read FOnAfterCreateOrAlterDBEvent write FOnAfterCreateOrAlterDBEvent;
@@ -163,7 +163,6 @@ type
     FPassword: String;
     FUserName: String;
   protected
-    function GetConnectionDef: IIoConnectionDef; override;
     procedure InitConnectionDef; override;
   public
     constructor Create(AOwner: TComponent); override;
@@ -203,6 +202,8 @@ type
 
   // Class for Firebird connection
   TioFirebirdConnectionDef = class(TioDBConnectionDef)
+  strict private
+    FSQLDialect: TioSQLDialect;
   protected
     function GetConnectionDef: IIoConnectionDef; override;
     procedure InitConnectionDef; override;
@@ -226,8 +227,9 @@ type
     property Pooled;
     property Port;
     property Protocol;
+    property QuotedIdentifiers;
     property Server;
-    property SQLDialect;
+    property SQLDialect: TioSQLDialect read FSQLDialect write FSQLDialect;
     property UserName;
     // Events
     property OnAfterCreateOrAlterDB;
@@ -331,8 +333,6 @@ begin
 //  inherited;      // Why? This is a virtual method and doesn't exists in anchestor class - Carlo Marona 2024-01-13
   DoBeforeRegister;
 
-  FConnectionDef := GetConnectionDef;
-
   InitConnectionDef;
 
   // Mark the connection as registered in the ConnectionManager
@@ -371,11 +371,6 @@ constructor TioHttpConnectionDef.Create(AOwner: TComponent);
 begin
   inherited;
   Persistent := True;
-end;
-
-function TioHttpConnectionDef.GetConnectionDef: IIoConnectionDef;
-begin
-  Result := nil;
 end;
 
 procedure TioHttpConnectionDef.InitConnectionDef;
@@ -418,6 +413,8 @@ end;
 constructor TioFirebirdConnectionDef.Create(AOwner: TComponent);
 begin
   inherited;
+  FSQLDialect := TioSQLDialect.sqlDialect3;
+  QuotedIdentifiers := True;
   Port := 3050;
 end;
 
@@ -551,8 +548,8 @@ begin
   FPort := 0;
   FProtocol := TioProtocol.pTCPIP;
   FServer := '';
-  FSQLDialect := TioSQLDialect.sqlDialect3;
   FUserName := '';
+  FQuotedIdentifiers := False;
   FAutoCreateDBProps := TioDBBuilderProperty.Create;
 end;
 
@@ -606,6 +603,13 @@ begin
     Result := TPath.GetFullPath(TPath.Combine(LDBFolder, FDatabase))
   else
     Result := FDatabase;
+end;
+
+procedure TioDBConnectionDef.InitConnectionDef;
+begin
+  inherited;
+
+  FConnectionDef := GetConnectionDef;
 end;
 
 procedure TioDBConnectionDef.RegisterConnectionDef;
