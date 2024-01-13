@@ -180,6 +180,8 @@ type
     function GetConnectionDef: IIoConnectionDef; override;
     procedure InitConnectionDef; override;
   public
+    constructor Create(AOwner: TComponent); override;
+
     function DBBuilder: IioDBBuilderEngine; override;
     // Properties
     property ConnectionDef;
@@ -381,6 +383,13 @@ begin
 end;
 
 { TioSQLiteConnectionDef }
+
+constructor TioSQLiteConnectionDef.Create(AOwner: TComponent);
+begin
+  inherited;
+
+  QuotedIdentifiers := True;
+end;
 
 function TioSQLiteConnectionDef.DBBuilder: IioDBBuilderEngine;
 begin
