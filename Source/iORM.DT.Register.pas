@@ -15,7 +15,8 @@ uses
   iORM.LiveBindings.PrototypeBindSource.Detail, DesignIntf, iORM.MVVM.ModelPresenter.Master, iORM.MVVM.ModelPresenter.Detail, iORM.MVVM.ModelDataSet,
   iORM.MVVM.ModelBindSource, iORM.MVVM.ViewModelBridge, iORM.MVVM.ViewContextProvider, System.Actions, iORM.StdActions.VCL, iORM.StdActions.FMX,
   iORM.DT.ViewModel.Wizard, iORM.MVVM.ViewModel, DesignEditors, iORM.StdActions.CloseQueryRepeater, iORM.Abstraction.uniGUI,
-  iORM.DT.CompAutoUses, iORM.MVVM.VMAction;
+  iORM.DT.CompAutoUses, iORM.MVVM.VMAction, iORM.DB.ConnectionDef.SQLite, iORM.DB.ConnectionDef.Firebird, iORM.DB.ConnectionDef.MySql,
+  iORM.DB.ConnectionDef.HTTP;
 
 
 
