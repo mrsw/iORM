@@ -69,43 +69,74 @@ type
   // Base class for all ConnectionDef components
   TioCustomConnectionDef = class(TComponent)
   strict private
-    // Events
-    FOnAfterCreateOrAlterDBEvent: TioDBBuilderAfterCreateOrAlterDBEvent;
     FOnAfterRegister: TNotifyEvent;
-    FOnBeforeCreateOrAlterDBEvent: TioDBBuilderBeforeCreateOrAlterDBEvent;
     FOnBeforeRegister: TNotifyEvent;
     // Fields
-    FAutoCreateDB: TioDBBuilderProperty;
-    FBaseURL: String;
-    FCharSet: String;
     FConnectionDef: IIoConnectionDef;
+    FAsDefault: Boolean;
+    FIsRegistered: Boolean;
+    FPersistent: Boolean;
+    function Get_Version: String;
+    procedure SetAsDefault(const Value: Boolean);
+  protected
+    procedure DoAfterRegister;
+    procedure DoBeforeRegister;
+    function GetConnectionDef: IIoConnectionDef; virtual; abstract;
+    procedure InitConnectionDef; virtual;
+    procedure Loaded; override;
+  public
+    constructor Create(AOwner: TComponent); override;
+
+    procedure RegisterConnectionDef; virtual;
+    // Properties
+    property AsDefault: Boolean read FAsDefault write SetAsDefault;
+    property ConnectionDef: IIoConnectionDef read FConnectionDef;
+    property IsRegistered: Boolean read FIsRegistered;
+    property Persistent: Boolean read FPersistent write FPersistent;
+  published
+    property _Version: String read Get_Version;
+    // Events
+    property OnAfterRegister: TNotifyEvent read FOnAfterRegister write FOnAfterRegister;
+    property OnBeforeRegister: TNotifyEvent read FOnBeforeRegister write FOnBeforeRegister;
+  end;
+
+
+  TioDBConnectionDef = class(TioCustomConnectionDef)
+  strict private
+    // Events
+    FOnAfterCreateOrAlterDBEvent: TioDBBuilderAfterCreateOrAlterDBEvent;
+    FOnBeforeCreateOrAlterDBEvent: TioDBBuilderBeforeCreateOrAlterDBEvent;
+    // Fields
+    FAutoCreateDBProps: TioDBBuilderProperty;
+    FCharSet: String;
     FDatabase: String;
     FDatabaseStdFolder: TioDBStdFolder;
-    FAsDefault: Boolean;
     FEncrypt: String;
-    FIsRegistered: Boolean;
     FNewPassword: String;
     FOSAuthent: TioOSAuthent;
     FPassword: String;
-    FPersistent: Boolean;
     FPooled: Boolean;
     FPort: Integer;
     FProtocol: TioProtocol;
     FServer: String;
     FSQLDialect: TioSQLDialect;
     FUserName: String;
-    function Get_Version: String;
-    procedure SetAsDefault(const Value: Boolean);
+  private
+    FCollation: String;
   protected
     function DBBuilder: IioDBBuilderEngine; virtual;
-    procedure DoAfterRegister;
-    procedure DoBeforeRegister;
-    function GetFullPathDatabase: String;
-    procedure Loaded; override;
+    function GetFullPathDatabase: string;
+  public
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+
+    procedure CreateOrAlterDB(const AForce: Boolean = False); virtual;
+    procedure RegisterConnectionDef; override;
+
     // Properties
-    property AutoCreateDB: TioDBBuilderProperty read FAutoCreateDB write FAutoCreateDB;
-    property BaseURL: String read FBaseURL write FBaseURL;
+    property AutoCreateDB: TioDBBuilderProperty read FAutoCreateDBProps write FAutoCreateDBProps;
     property CharSet: String read FCharSet write FCharSet;
+    property Collation: String read FCollation write FCollation;
     property Database: String read FDatabase write FDatabase;
     property DatabaseStdFolder: TioDBStdFolder read FDatabaseStdFolder write FDatabaseStdFolder;
     property Encrypt: String read FEncrypt write FEncrypt;
@@ -119,42 +150,37 @@ type
     property SQLDialect: TioSQLDialect read FSQLDialect write FSQLDialect;
     property UserName: String read FUserName write FUserName;
     // Events
-    property OnAfterCreateOrAlterDB: TioDBBuilderAfterCreateOrAlterDBEvent read FOnAfterCreateOrAlterDBEvent
-      write FOnAfterCreateOrAlterDBEvent;
-    property OnBeforeCreateOrAlterDB: TioDBBuilderBeforeCreateOrAlterDBEvent read FOnBeforeCreateOrAlterDBEvent
-      write FOnBeforeCreateOrAlterDBEvent;
-  public
-    constructor Create(AOwner: TComponent); override;
-    destructor Destroy; override;
-    procedure CreateOrAlterDB(const AForce: Boolean = False); virtual;
-    procedure RegisterConnectionDef; virtual;
-    // Properties
-    property AsDefault: Boolean read FAsDefault write SetAsDefault;
-    property ConnectionDef: IIoConnectionDef read FConnectionDef write FConnectionDef;
-    property IsRegistered: Boolean read FIsRegistered;
-    property Persistent: Boolean read FPersistent write FPersistent;
-  published
-    property _Version: String read Get_Version;
-    // Events
-    property OnAfterRegister: TNotifyEvent read FOnAfterRegister write FOnAfterRegister;
-    property OnBeforeRegister: TNotifyEvent read FOnBeforeRegister write FOnBeforeRegister;
+    property OnAfterCreateOrAlterDB: TioDBBuilderAfterCreateOrAlterDBEvent read FOnAfterCreateOrAlterDBEvent write FOnAfterCreateOrAlterDBEvent;
+    property OnBeforeCreateOrAlterDB: TioDBBuilderBeforeCreateOrAlterDBEvent read FOnBeforeCreateOrAlterDBEvent write FOnBeforeCreateOrAlterDBEvent;
   end;
+
 
   // Class for http connection
   TioHttpConnectionDef = class(TioCustomConnectionDef)
+  strict private
+    // Fields
+    FBaseURL: String;
+    FPassword: String;
+    FUserName: String;
+  protected
+    function GetConnectionDef: IIoConnectionDef; override;
+    procedure InitConnectionDef; override;
   public
     constructor Create(AOwner: TComponent); override;
-    procedure RegisterConnectionDef; override;
   published
     property AsDefault;
-    property BaseURL;
+    property BaseURL: String read FBaseURL write FBaseURL;
+    property Password: String read FPassword write FPassword;
     property Persistent;
+    property UserName: String read FUserName write FUserName;
   end;
 
   // Class for SQLite connection
-  TioSQLiteConnectionDef = class(TioCustomConnectionDef)
+  TioSQLiteConnectionDef = class(TioDBConnectionDef)
+  protected
+    function GetConnectionDef: IIoConnectionDef; override;
+    procedure InitConnectionDef; override;
   public
-    procedure RegisterConnectionDef; override;
     function DBBuilder: IioDBBuilderEngine; override;
     // Properties
     property ConnectionDef;
@@ -175,10 +201,13 @@ type
   end;
 
   // Class for Firebird connection
-  TioFirebirdConnectionDef = class(TioCustomConnectionDef)
+  TioFirebirdConnectionDef = class(TioDBConnectionDef)
+  protected
+    function GetConnectionDef: IIoConnectionDef; override;
+    procedure InitConnectionDef; override;
   public
     constructor Create(AOwner: TComponent); override;
-    procedure RegisterConnectionDef; override;
+
     function DBBuilder: IioDBBuilderEngine; override;
     // Properties
     property ConnectionDef;
@@ -187,6 +216,7 @@ type
     property AsDefault;
     property AutoCreateDB;
     property CharSet;
+    property Collation;
     property Database;
     property DatabaseStdFolder;
     property OSAuthent;
@@ -204,10 +234,13 @@ type
   end;
 
   // Class for MySQL connection
-  TioMySQLConnectionDef = class(TioCustomConnectionDef)
+  TioMySQLConnectionDef = class(TioDBConnectionDef)
+  protected
+    function GetConnectionDef: IIoConnectionDef; override;
+    procedure InitConnectionDef; override;
   public
     constructor Create(AOwner: TComponent); override;
-    procedure RegisterConnectionDef; override;
+
     function DBBuilder: IioDBBuilderEngine; override;
     // Properties
     property ConnectionDef;
@@ -253,35 +286,10 @@ uses
 constructor TioCustomConnectionDef.Create(AOwner: TComponent);
 begin
   inherited;
-  FBaseURL := '';
-  FCharSet := '';
-  FDatabase := '';
-  FDatabaseStdFolder := TioDBStdFolder.sfUndefined;
+
   FAsDefault := True;
-  FEncrypt := '';
   FIsRegistered := False;
-  FNewPassword := '';
-  FOSAuthent := TioOSAuthent.oaNo;
-  FPassword := '';
   FPersistent := False;
-  FPooled := False;
-  FPort := 0;
-  FProtocol := TioProtocol.pTCPIP;
-  FServer := '';
-  FSQLDialect := TioSQLDialect.sqlDialect3;
-  FUserName := '';
-  FAutoCreateDB := TioDBBuilderProperty.Create;
-end;
-
-function TioCustomConnectionDef.DBBuilder: IioDBBuilderEngine;
-begin
-  Result := TioDBBuilderFactory.NewEngine(Name, FAutoCreateDB.Indexes, FAutoCreateDB.ForeignKeys);
-end;
-
-destructor TioCustomConnectionDef.Destroy;
-begin
-  FAutoCreateDB.Free;
-  inherited;
 end;
 
 procedure TioCustomConnectionDef.DoAfterRegister;
@@ -296,50 +304,14 @@ begin
     FOnBeforeRegister(Self);
 end;
 
-procedure TioCustomConnectionDef.CreateOrAlterDB(const AForce: Boolean = False);
-var
-  LAbort: Boolean;
-  LDBBuilderEngine: IioDBBuilderEngine;
-begin
-  LAbort := False;
-  LDBBuilderEngine := TioDBBuilderFactory.NewEngine(Name, FAutoCreateDB.Indexes, FAutoCreateDB.ForeignKeys);
-  if Assigned(FOnBeforeCreateOrAlterDBEvent) then
-    FOnBeforeCreateOrAlterDBEvent(Self, LDBBuilderEngine.Status, LDBBuilderEngine.Script, LDBBuilderEngine.Warnings, LAbort);
-  if not LAbort then
-  begin
-    LDBBuilderEngine.CreateOrAlterDB(AForce);
-    if Assigned(FOnAfterCreateOrAlterDBEvent) then
-      FOnAfterCreateOrAlterDBEvent(Self, LDBBuilderEngine.Status, LDBBuilderEngine.Script, LDBBuilderEngine.Warnings);
-  end;
-end;
-
-function TioCustomConnectionDef.GetFullPathDatabase: String;
-var
-  LDBFolder: String;
-begin
-  case FDatabaseStdFolder of
-    TioDBStdFolder.sfDocuments:
-      LDBFolder := TPath.GetDocumentsPath;
-    TioDBStdFolder.sfSharedDocuments:
-      LDBFolder := TPath.GetSharedDocumentsPath;
-    TioDBStdFolder.sfHome:
-      LDBFolder := TPath.GetHomePath;
-    TioDBStdFolder.sfPublic:
-      LDBFolder := TPath.GetPublicPath;
-    TioDBStdFolder.sfTemp:
-      LDBFolder := TPath.GetTempPath;
-  else
-    LDBFolder := '';
-  end;
-  if not LDBFolder.IsEmpty then
-    Result := TPath.GetFullPath(TPath.Combine(LDBFolder, FDatabase))
-  else
-    Result := FDatabase;
-end;
-
 function TioCustomConnectionDef.Get_Version: String;
 begin
   Result := io.Version;
+end;
+
+procedure TioCustomConnectionDef.InitConnectionDef;
+begin
+
 end;
 
 procedure TioCustomConnectionDef.Loaded;
@@ -349,19 +321,22 @@ begin
   if (csDesigning in ComponentState) then
     Exit;
   if (not FIsRegistered) then
-         RegisterConnectionDef;
+    RegisterConnectionDef;
 end;
 
 procedure TioCustomConnectionDef.RegisterConnectionDef;
 begin
-  inherited;
+//  inherited;      // Why? This is a virtual method and doesn't exists in anchestor class - Carlo Marona 2024-01-13
+  DoBeforeRegister;
+
+  FConnectionDef := GetConnectionDef;
+
+  InitConnectionDef;
+
   // Mark the connection as registered in the ConnectionManager
   FIsRegistered := True;
   // Fire the OnAfterRegister event if implemented
   DoAfterRegister;
-  // Autocreate Database if enabled
-  if FAutoCreateDB.Enabled then
-    CreateOrAlterDB;
 end;
 
 procedure TioCustomConnectionDef.SetAsDefault(const Value: Boolean);
@@ -396,14 +371,16 @@ begin
   Persistent := True;
 end;
 
-procedure TioHttpConnectionDef.RegisterConnectionDef;
+function TioHttpConnectionDef.GetConnectionDef: IIoConnectionDef;
 begin
-  // Fire the OnBeforeRegister event if implemented
-  DoBeforeRegister;
-  // Register the ConnectionDef
-  TioConnectionManager.NewHttpConnection(BaseURL, AsDefault, Persistent, Name);
-  // NB: Inherited must be the last line (set FIsRegistered)
+  Result := nil;
+end;
+
+procedure TioHttpConnectionDef.InitConnectionDef;
+begin
   inherited;
+
+  TioConnectionManager.NewHttpConnection(BaseURL, AsDefault, Persistent, Name);
 end;
 
 { TioSQLiteConnectionDef }
@@ -414,12 +391,15 @@ begin
   // Only to elevate the method visibility
 end;
 
-procedure TioSQLiteConnectionDef.RegisterConnectionDef;
+function TioSQLiteConnectionDef.GetConnectionDef: IIoConnectionDef;
 begin
-  // Fire the OnBeforeRegister event if implemented
-  DoBeforeRegister;
-  // Register the ConnectionDef
-  ConnectionDef := TioConnectionManager.NewSQLiteConnectionDef(GetFullPathDatabase, AsDefault, Persistent, Pooled, Name);
+  Result := TioConnectionManager.NewSQLiteConnectionDef(GetFullPathDatabase, AsDefault, Persistent, Pooled, Name);
+end;
+
+procedure TioSQLiteConnectionDef.InitConnectionDef;
+begin
+  inherited;
+
   // Encript
   if not Encrypt.IsEmpty then
     ConnectionDef.Params.Values['Encrypt'] := Encrypt;
@@ -429,8 +409,6 @@ begin
   // Password
   if not Password.IsEmpty then
     ConnectionDef.Params.Password := Password;
-  // NB: Inherited must be the last line (set FIsRegistered)
-  inherited;
 end;
 
 { TioFirebirdConnectionDef }
@@ -447,13 +425,16 @@ begin
   // Only to elevate the method visibility
 end;
 
-procedure TioFirebirdConnectionDef.RegisterConnectionDef;
+function TioFirebirdConnectionDef.GetConnectionDef: IIoConnectionDef;
 begin
-  // Fire the OnBeforeRegister event if implemented
-  DoBeforeRegister;
-  // Register the ConnectionDef
-  ConnectionDef := TioConnectionManager.NewFirebirdConnectionDef(Server, GetFullPathDatabase, UserName, Password, CharSet,
+  Result := TioConnectionManager.NewFirebirdConnectionDef(Server, GetFullPathDatabase, UserName, Password, CharSet,
     AsDefault, Persistent, Pooled, Name);
+end;
+
+procedure TioFirebirdConnectionDef.InitConnectionDef;
+begin
+  inherited;
+
   // OSAuthent
   case OSAuthent of
     TioOSAuthent.oaNo:
@@ -488,8 +469,6 @@ begin
     ConnectionDef.Params.Values['OpenMode'] := 'OpenOrCreate'
   else
     ConnectionDef.Params.Values['OpenMode'] := 'Open';
-  // NB: Inherited must be the last line (set FIsRegistered)
-  inherited;
 end;
 
 { TioMySQLConnectionDef }
@@ -506,18 +485,20 @@ begin
   // Only to elevate the method visibility
 end;
 
-procedure TioMySQLConnectionDef.RegisterConnectionDef;
+function TioMySQLConnectionDef.GetConnectionDef: IIoConnectionDef;
 begin
-  // Fire the OnBeforeRegister event if implemented
-  DoBeforeRegister;
-  // Register the ConnectionDef
-  ConnectionDef := TioConnectionManager.NewMySQLConnectionDef(Server, GetFullPathDatabase, UserName, Password, CharSet,
+  Result := TioConnectionManager.NewMySQLConnectionDef(Server, GetFullPathDatabase, UserName, Password, CharSet,
     AsDefault, Persistent, Pooled, Name);
+end;
+
+procedure TioMySQLConnectionDef.InitConnectionDef;
+begin
+  inherited;
+
   // Port
   ConnectionDef.Params.Values['Port'] := Port.ToString;
-  // NB: Inherited must be the last line (set FIsRegistered)
-  inherited;
 end;
+
 
 { TioSQLMonitor }
 
@@ -550,6 +531,88 @@ begin
   FEnabled := False;
   FIndexes := True;
   FForeignKeys := True;
+end;
+
+{ TioDBConnectionDef }
+
+constructor TioDBConnectionDef.Create(AOwner: TComponent);
+begin
+  inherited;
+  FCharSet := '';
+  FDatabase := '';
+  FDatabaseStdFolder := TioDBStdFolder.sfUndefined;
+  FEncrypt := '';
+  FNewPassword := '';
+  FOSAuthent := TioOSAuthent.oaNo;
+  FPassword := '';
+  FPooled := False;
+  FPort := 0;
+  FProtocol := TioProtocol.pTCPIP;
+  FServer := '';
+  FSQLDialect := TioSQLDialect.sqlDialect3;
+  FUserName := '';
+  FAutoCreateDBProps := TioDBBuilderProperty.Create;
+end;
+
+procedure TioDBConnectionDef.CreateOrAlterDB(const AForce: Boolean);
+var
+  LAbort: Boolean;
+  LDBBuilderEngine: IioDBBuilderEngine;
+begin
+  LAbort := False;
+  LDBBuilderEngine := TioDBBuilderFactory.NewEngine(Name, FAutoCreateDBProps.Indexes, FAutoCreateDBProps.ForeignKeys);
+  if Assigned(FOnBeforeCreateOrAlterDBEvent) then
+    FOnBeforeCreateOrAlterDBEvent(Self, LDBBuilderEngine.Status, LDBBuilderEngine.Script, LDBBuilderEngine.Warnings, LAbort);
+  if not LAbort then
+  begin
+    LDBBuilderEngine.CreateOrAlterDB(AForce);
+    if Assigned(FOnAfterCreateOrAlterDBEvent) then
+      FOnAfterCreateOrAlterDBEvent(Self, LDBBuilderEngine.Status, LDBBuilderEngine.Script, LDBBuilderEngine.Warnings);
+  end;
+end;
+
+function TioDBConnectionDef.DBBuilder: IioDBBuilderEngine;
+begin
+  Result := TioDBBuilderFactory.NewEngine(Name, FAutoCreateDBProps.Indexes, FAutoCreateDBProps.ForeignKeys);
+end;
+
+destructor TioDBConnectionDef.Destroy;
+begin
+  FAutoCreateDBProps.Free;
+  inherited;
+end;
+
+function TioDBConnectionDef.GetFullPathDatabase: string;
+var
+  LDBFolder: String;
+begin
+  case FDatabaseStdFolder of
+    TioDBStdFolder.sfDocuments:
+      LDBFolder := TPath.GetDocumentsPath;
+    TioDBStdFolder.sfSharedDocuments:
+      LDBFolder := TPath.GetSharedDocumentsPath;
+    TioDBStdFolder.sfHome:
+      LDBFolder := TPath.GetHomePath;
+    TioDBStdFolder.sfPublic:
+      LDBFolder := TPath.GetPublicPath;
+    TioDBStdFolder.sfTemp:
+      LDBFolder := TPath.GetTempPath;
+  else
+    LDBFolder := '';
+  end;
+  if not LDBFolder.IsEmpty then
+    Result := TPath.GetFullPath(TPath.Combine(LDBFolder, FDatabase))
+  else
+    Result := FDatabase;
+end;
+
+procedure TioDBConnectionDef.RegisterConnectionDef;
+begin
+  inherited;
+
+  // Autocreate Database if enabled
+  if FAutoCreateDBProps.Enabled then
+    CreateOrAlterDB;
 end;
 
 end.
