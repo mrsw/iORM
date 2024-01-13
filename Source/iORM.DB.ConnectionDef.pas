@@ -197,6 +197,7 @@ type
     property Password;
     property Persistent;
     property Pooled;
+    property QuotedIdentifiers;
     // Events
     property OnAfterCreateOrAlterDB;
     property OnBeforeCreateOrAlterDB;
