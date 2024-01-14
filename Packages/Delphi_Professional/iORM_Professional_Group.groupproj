@@ -9,6 +9,9 @@
         <Projects Include="iORM_DT.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="..\..\Samples\PizzAmore_25_LowCode_Classes_SimpleViews\vcl\PizzAmore_25_LowCode_Classes_SimpleViews_Vcl.dproj">
+            <Dependencies/>
+        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -35,14 +38,23 @@
     <Target Name="iORM_DT:Make">
         <MSBuild Projects="iORM_DT.dproj" Targets="Make"/>
     </Target>
+    <Target Name="PizzAmore_25_LowCode_Classes_SimpleViews_Vcl">
+        <MSBuild Projects="..\..\Samples\PizzAmore_25_LowCode_Classes_SimpleViews\vcl\PizzAmore_25_LowCode_Classes_SimpleViews_Vcl.dproj"/>
+    </Target>
+    <Target Name="PizzAmore_25_LowCode_Classes_SimpleViews_Vcl:Clean">
+        <MSBuild Projects="..\..\Samples\PizzAmore_25_LowCode_Classes_SimpleViews\vcl\PizzAmore_25_LowCode_Classes_SimpleViews_Vcl.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="PizzAmore_25_LowCode_Classes_SimpleViews_Vcl:Make">
+        <MSBuild Projects="..\..\Samples\PizzAmore_25_LowCode_Classes_SimpleViews\vcl\PizzAmore_25_LowCode_Classes_SimpleViews_Vcl.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="iORM_RT;iORM_DT"/>
+        <CallTarget Targets="iORM_RT;iORM_DT;PizzAmore_25_LowCode_Classes_SimpleViews_Vcl"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="iORM_RT:Clean;iORM_DT:Clean"/>
+        <CallTarget Targets="iORM_RT:Clean;iORM_DT:Clean;PizzAmore_25_LowCode_Classes_SimpleViews_Vcl:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="iORM_RT:Make;iORM_DT:Make"/>
+        <CallTarget Targets="iORM_RT:Make;iORM_DT:Make;PizzAmore_25_LowCode_Classes_SimpleViews_Vcl:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

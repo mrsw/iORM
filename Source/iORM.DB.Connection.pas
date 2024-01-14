@@ -59,19 +59,19 @@ type
   // This is the base class for all connections
   TioConnectionBase = class(TInterfacedObject, IioConnection)
   strict private
-    FConnectionInfo: TioConnectionInfo;
+    FConnectionInfo: IioConnectionInfo;
     FTransactionCounter: Integer;
   strict protected
     procedure DoStartTransaction; virtual; abstract;
     procedure DoCommitTransaction; virtual; abstract;
     procedure DoRollbackTransaction; virtual; abstract;
   public
-    constructor Create(const AConnectionInfo:TioConnectionInfo);
+    constructor Create(const AConnectionInfo: IioConnectionInfo);
     function IsDBConnection: Boolean;
     function IsHttpConnection: Boolean;
     function AsDBConnection: IioConnectionDB; virtual;
     function AsHttpConnection: IioConnectionHttp; virtual;
-    function GetConnectionInfo: TioConnectionInfo;
+    function GetConnectionInfo: IioConnectionInfo;
     function InTransaction: Boolean; virtual; abstract;
     procedure StartTransaction;
     procedure Commit;
@@ -91,7 +91,7 @@ type
     procedure DoCommitTransaction; override;
     procedure DoRollbackTransaction; override;
   public
-    constructor Create(const AConnection:TioInternalSqlConnection; const AQueryContainer:IioQueryContainer; const AConnectionInfo:TioConnectionInfo);
+    constructor Create(const AConnection: TioInternalSqlConnection; const AQueryContainer:IioQueryContainer; const AConnectionInfo: IioDBConnectionInfo);
     destructor Destroy; override;
     procedure LastTransactionTimestampReset;
     function LastTransactionTimestamp: TDateTime;
@@ -131,14 +131,14 @@ begin
     TioDBFactory.ConnectionContainer.FreeConnection(Self);
 end;
 
-constructor TioConnectionBase.Create(const AConnectionInfo:TioConnectionInfo);
+constructor TioConnectionBase.Create(const AConnectionInfo: IioConnectionInfo);
 begin
   inherited Create;
   FConnectionInfo := AConnectionInfo;
   FTransactionCounter := 0;
 end;
 
-function TioConnectionBase.GetConnectionInfo: TioConnectionInfo;
+function TioConnectionBase.GetConnectionInfo: IioConnectionInfo;
 begin
   Result := FConnectionInfo;
 end;
@@ -183,7 +183,7 @@ end;
 
 constructor TioConnectionDB.Create(const AConnection: TioInternalSqlConnection;
   const AQueryContainer: IioQueryContainer;
-  const AConnectionInfo: TioConnectionInfo);
+  const AConnectionInfo: IioDBConnectionInfo);
 begin
   inherited Create(AConnectionInfo);
   FFDGUIxWaitCursor := TFDGUIxWaitCursor.Create(nil);

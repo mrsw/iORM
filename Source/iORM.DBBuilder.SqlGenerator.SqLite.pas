@@ -177,15 +177,17 @@ function TioDBBuilderSqlGenSQLite.InternalCreateField(const AField: IioDBBuilder
 var
   LDefault: string;
   LNotNull: string;
+  LFieldName: string;
 begin
   // Extract the default value if extsts
   LDefault := ExtractFieldDefaultValue(AField);
+  LFieldName := IfThen(FSchema.QuotedIdentifiers, AField.FieldName.QuotedString('"'), AField.FieldName);
   // If primary key...
   if AField.PrimaryKey then
-    Exit(Format('"%s" INTEGER %s PRIMARY KEY NOT NULL', [AField.FieldName, LDefault])); // Add AUTOINCREMENT keyword???
+    Exit(Format('%s INTEGER %s PRIMARY KEY NOT NULL', [LFieldName, LDefault])); // Add AUTOINCREMENT keyword???
   // ...then continue
   LNotNull := IfThen(AField.FieldNotNull, 'NOT NULL', 'NULL');
-  Result := Format('"%s" %s %s %s', [AField.FieldName, TranslateFieldType(AField), LNotNull, LDefault]).Trim;
+  Result := Format('%s %s %s %s', [LFieldName, TranslateFieldType(AField), LNotNull, LDefault]).Trim;
 end;
 
 procedure TioDBBuilderSqlGenSQLite.RenameAllTablesToOld;
@@ -239,7 +241,7 @@ begin
   begin
     if LField.Status = stCreate then
       Continue;
-    ScriptAdd(Format('%s%s', [LComma, LField.FieldName]));
+    ScriptAdd(Format('%s%s', [LComma, IfThen(FSchema.QuotedIdentifiers, LField.FieldName.QuotedString('"'), LField.FieldName)]));
     LComma := ',';
   end;
   // Select from
@@ -250,7 +252,7 @@ begin
   begin
     if LField.Status = stCreate then
       Continue;
-    ScriptAdd(Format('%s%s', [LComma, LField.FieldName]));
+    ScriptAdd(Format('%s%s', [LComma, IfThen(FSchema.QuotedIdentifiers, LField.FieldName.QuotedString('"'), LField.FieldName)]));
     LComma := ',';
   end;
   ScriptAdd(Format('FROM %s', [Table2OldTableName(ATable)]));

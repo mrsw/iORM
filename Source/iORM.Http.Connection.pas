@@ -54,7 +54,7 @@ type
     procedure DoCommitTransaction; override;
     procedure DoRollbackTransaction; override;
   public
-    constructor Create(const AConnectionInfo:TioConnectionInfo);
+    constructor Create(const AConnectionInfo: IioHTTPConnectionInfo);
     destructor Destroy; override;
     function AsHttpConnection: IioConnectionHttp; override;
     function InTransaction: Boolean; override;
@@ -77,7 +77,7 @@ begin
   Result := Self;
 end;
 
-constructor TioConnectionHttp.Create(const AConnectionInfo: TioConnectionInfo);
+constructor TioConnectionHttp.Create(const AConnectionInfo: IioHTTPConnectionInfo);
 begin
   inherited Create(AConnectionInfo);
   // Create the RESTClient

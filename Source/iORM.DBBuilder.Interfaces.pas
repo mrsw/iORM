@@ -128,6 +128,10 @@ type
     // Status
     function GetStatus: TioDBBuilderStatus;
     procedure SetStatus(const Value: TioDBBuilderStatus);
+    function GetCollation: String;
+    function GetQuotedIdentifiers: boolean;
+    property Collation: string read GetCollation;
+    property QuotedIdentifiers: boolean read GetQuotedIdentifiers;
     property Status: TioDBBuilderStatus read GetStatus write SetStatus;
   end;
 

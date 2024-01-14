@@ -124,7 +124,7 @@ end;
 
 class function TioDbFactory.NewConnection(const AConnectionName: String): IioConnection;
 var
-  LConnectionInfo: TioConnectionInfo;
+  LConnectionInfo: IioConnectionInfo;
   function NewConnectionDB: IioConnectionDB;
   var
     LConnection: TioInternalSqlConnection;
@@ -155,17 +155,18 @@ var
     // Open the connection
     LConnection.Open;
     // Create the ioConnection and his QueryContainer and return it
-    Result := TioConnectionDB.Create(LConnection, Self.QueryContainer, TioConnectionManager.GetConnectionInfo(AConnectionName));
+    Result := TioConnectionDB.Create(LConnection, Self.QueryContainer, TioConnectionManager.GetDBConnectionInfo(AConnectionName));
   end;
   function NewConnectionHttp: IioConnectionHttp;
   begin
-    Result := TioConnectionHttp.Create(LConnectionInfo);
+    Result := TioConnectionHttp.Create(LConnectionInfo as IioHTTPConnectionInfo);
   end;
 
 begin
   // Get connection info
   LConnectionInfo := TioConnectionManager.GetConnectionInfo(AConnectionName);
-  if LConnectionInfo.ConnectionType = TioConnectionType.ctHTML then
+
+  if Supports(LConnectionInfo, IioHTTPConnectionInfo) then
     Result := NewConnectionHttp
   else
     Result := NewConnectionDB;

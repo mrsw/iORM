@@ -8516,8 +8516,6 @@ object MainForm: TMainForm
     Font.Style = [fsBold]
     ParentFont = False
     TabOrder = 0
-    ExplicitTop = 335
-    ExplicitWidth = 161
   end
   object ButtonCustomers: TButton
     Left = 43
@@ -8533,8 +8531,6 @@ object MainForm: TMainForm
     Font.Style = [fsBold]
     ParentFont = False
     TabOrder = 1
-    ExplicitTop = 385
-    ExplicitWidth = 161
   end
   object ButtonPizzas: TButton
     Left = 43
@@ -8550,8 +8546,6 @@ object MainForm: TMainForm
     Font.Style = [fsBold]
     ParentFont = False
     TabOrder = 2
-    ExplicitTop = 435
-    ExplicitWidth = 161
   end
   object ButtonQuit: TButton
     Left = 43
@@ -8567,8 +8561,6 @@ object MainForm: TMainForm
     Font.Style = []
     ParentFont = False
     TabOrder = 3
-    ExplicitTop = 500
-    ExplicitWidth = 161
   end
   object ioVCL1: TioVCL
     Left = 8
@@ -8581,6 +8573,7 @@ object MainForm: TMainForm
     DatabaseStdFolder = sfDocuments
     Persistent = False
     Pooled = False
+    QuotedIdentifiers = False
     OnAfterCreateOrAlterDB = SQLiteConnAfterCreateOrAlterDB
     Left = 64
     Top = 272

@@ -80,18 +80,108 @@ type
 
   TioKeyGenerationTime = (kgtUndefined, kgtAfterInsert, kgtBeforeInsert);
 
-  TioConnectionInfo = record
-    BaseURL: String;
-    ConnectionName: String;
-    ConnectionType: TioConnectionType;
-    KeyGenerationTime: TioKeyGenerationTime;
-    Password: String;
-    Persistent: Boolean;
-    Strategy: TioStrategyRef;
-    UserName: String;
-    constructor Create(const AConnectionName: String; const AConnectionType: TioConnectionType; const APersistent: Boolean;
-      const AKeyGenerationTime: TioKeyGenerationTime);
+//  TioConnectionInfo = record
+//    BaseURL: String;
+//    ConnectionName: String;
+//    ConnectionType: TioConnectionType;
+//    KeyGenerationTime: TioKeyGenerationTime;
+//    Password: String;
+//    Persistent: Boolean;
+//    Strategy: TioStrategyRef;
+//    UserName: String;
+//    constructor Create(const AConnectionName: String; const AConnectionType: TioConnectionType; const APersistent: Boolean;
+//      const AKeyGenerationTime: TioKeyGenerationTime);
+//  end;
+
+  IioConnectionInfo = interface
+    ['{05368F43-8543-4263-8AD9-1E2BB3C05EDF}']
+    function GetConnectionName: string;
+    function GetConnectionType: TioConnectionType;
+    function GetPassword: string;
+    function GetPersistent: Boolean;
+    function GetStrategy: TioStrategyRef;
+    function GetUserName: String;
+    property ConnectionName: string read GetConnectionName;
+    property ConnectionType: TioConnectionType read GetConnectionType;
+    property Password: string read GetPassword;
+    property Persistent: Boolean read GetPersistent;
+    property Strategy: TioStrategyRef read GetStrategy;
+    property UserName: String read GetUserName;
   end;
+
+  TioConnectionInfo = class(TInterfacedObject, IioConnectionInfo)
+  private
+    FConnectionName: String;
+    FConnectionType: TioConnectionType;
+    FPassword: String;
+    FPersistent: Boolean;
+    FStrategy: TioStrategyRef;
+    FUserName: String;
+    function GetConnectionName: string;
+    function GetConnectionType: TioConnectionType;
+    function GetPassword: string;
+    function GetPersistent: Boolean;
+    function GetStrategy: TioStrategyRef;
+    function GetUserName: String;
+  public
+    constructor Create(const AConnectionName: String; const AConnectionType: TioConnectionType; const APersistent: Boolean);
+    property ConnectionName: string read GetConnectionName;
+    property ConnectionType: TioConnectionType read GetConnectionType;
+    property Password: string read GetPassword;
+    property Persistent: Boolean read GetPersistent;
+    property Strategy: TioStrategyRef read GetStrategy;
+    property UserName: String read GetUserName;
+  end;
+
+
+  IioDBConnectionInfo = interface(IioConnectionInfo)
+    ['{D2B16BBA-F685-4A53-86C6-478604F9EC2A}']
+    function GetCharSet: String;
+    function GetCollation: string;
+    function GetQuotedIdentifiers: Boolean;
+    function GetKeyGenerationTime: TioKeyGenerationTime;
+    property CharSet: String read GetCharSet;
+    property Collation: String read GetCollation;
+    property KeyGenerationTime: TioKeyGenerationTime read GetKeyGenerationTime;
+    property QuotedIdentifiers: Boolean read GetQuotedIdentifiers;
+  end;
+
+  TioDBConnectionInfo = class(TioConnectionInfo, IioDBConnectionInfo)
+  private
+    FKeyGenerationTime: TioKeyGenerationTime;
+    FCharSet: string;
+    FCollation: String;
+    FQuotedIdentifiers: Boolean;
+    function GetKeyGenerationTime: TioKeyGenerationTime;
+    function GetCollation: String;
+    function GetQuotedIdentifiers: Boolean;
+    function GetCharSet: string;
+  public
+    constructor Create(const AConnectionName: String; const AConnectionType: TioConnectionType; const APersistent: Boolean;
+      const AKeyGenerationTime: TioKeyGenerationTime{; const ACharSet, ACollation: String; const QuotedIdentifiers: Boolean}); reintroduce;
+
+    property CharSet: string read GetCharSet;
+    property Collation: String read GetCollation;
+    property KeyGenerationTime: TioKeyGenerationTime read GetKeyGenerationTime;
+    property QuotedIdentifiers: Boolean read GetQuotedIdentifiers;
+  end;
+
+  IioHTTPConnectionInfo = interface(IioConnectionInfo)
+    ['{B1FF22C2-780C-401A-A251-272505F0782D}']
+    function GetBaseURL: string;
+    property BaseURL: string read GetBaseURL;
+  end;
+
+  TioHTTPConnectionInfo = class(TioConnectionInfo, IioHTTPConnectionInfo)
+  private
+    FBaseURL: String;
+    function GetBaseURL: string;
+  public
+    constructor Create(const AConnectionName: String; const APersistent: Boolean; ABaseURL: String); reintroduce;
+
+    property BaseURL: string read GetBaseURL;
+  end;
+
 
   TioCompareOperatorRef = class of TioCompareOperator;
   TioLogicRelationRef = class of TioLogicRelation;
@@ -131,7 +221,7 @@ type
     function IsHttpConnection: Boolean;
     function AsDBConnection: IioConnectionDB;
     function AsHttpConnection: IioConnectionHttp;
-    function GetConnectionInfo: TioConnectionInfo;
+    function GetConnectionInfo: IioConnectionInfo;
     function InTransaction: Boolean;
     procedure StartTransaction;
     procedure Commit;
@@ -734,14 +824,54 @@ end;
 
 { TioConnectionInfo }
 
-constructor TioConnectionInfo.Create(const AConnectionName: String; const AConnectionType: TioConnectionType; const APersistent: Boolean;
-  const AKeyGenerationTime: TioKeyGenerationTime);
+constructor TioConnectionInfo.Create(const AConnectionName: String; const AConnectionType: TioConnectionType;
+  const APersistent: Boolean); // const AKeyGenerationTime: TioKeyGenerationTime);
 begin
-  ConnectionName := AConnectionName;
-  ConnectionType := AConnectionType;
-  KeyGenerationTime := AKeyGenerationTime;
-  Persistent := APersistent;
-  Strategy := TioStrategyFactory.ConnectionTypeToStrategy(AConnectionType);
+  FConnectionName := AConnectionName;
+  FConnectionType := AConnectionType;
+//  FKeyGenerationTime := AKeyGenerationTime;
+  FPersistent := APersistent;
+  FStrategy := TioStrategyFactory.ConnectionTypeToStrategy(AConnectionType);
+end;
+
+//function TioConnectionInfo.GetBaseURL: string;
+//begin
+//  Result := FBaseURL;
+//end;
+
+function TioConnectionInfo.GetConnectionName: string;
+begin
+  Result := FConnectionName;
+end;
+
+function TioConnectionInfo.GetConnectionType: TioConnectionType;
+begin
+  Result := FConnectionType;
+end;
+
+//function TioConnectionInfo.GetKeyGenerationTime: TioKeyGenerationTime;
+//begin
+//  Result := FKeyGenerationTime;
+//end;
+
+function TioConnectionInfo.GetPassword: string;
+begin
+  Result := FPassword;
+end;
+
+function TioConnectionInfo.GetPersistent: Boolean;
+begin
+  Result := FPersistent;
+end;
+
+function TioConnectionInfo.GetStrategy: TioStrategyRef;
+begin
+  Result := FStrategy;
+end;
+
+function TioConnectionInfo.GetUserName: String;
+begin
+  Result := FUserName;
 end;
 
 { TioCompareOperator }
@@ -982,6 +1112,58 @@ begin
 {$IFNDEF ioStrategyInterceptorsOff}
   TioStrategyInterceptorRegister.AfterPersistObject(AObj);
 {$ENDIF}
+end;
+
+{ TioHTTPConnectionInfo }
+
+constructor TioHTTPConnectionInfo.Create(const AConnectionName: String; const APersistent: Boolean; ABaseURL: String);
+begin
+  inherited Create(AConnectionName, ctHTML, APersistent);
+
+  FBaseURL := ABaseURL;
+end;
+
+function TioHTTPConnectionInfo.GetBaseURL: string;
+begin
+  Result := FBaseURL;
+end;
+
+{ TioDBConnectionInfo }
+
+constructor TioDBConnectionInfo.Create(const AConnectionName: String; const AConnectionType: TioConnectionType;
+  const APersistent: Boolean; const AKeyGenerationTime: TioKeyGenerationTime{; const ACharSet, ACollation: String;
+  const QuotedIdentifiers: Boolean});
+begin
+  if AConnectionType = ctHTML then
+    raise EioException.Create(Self.ClassName, 'Create', Format('Invalid ConnectionType value "%s" for database connection',
+      [TioUtilities.EnumToString<TioConnectionType>(AConnectionType)]));
+
+  inherited Create(AConnectionName, AConnectionType, APersistent);
+
+//  FCharSet := ACharSet;
+//  FCollation := ACollation;
+  FKeyGenerationTime := AKeyGenerationTime;
+  FQuotedIdentifiers := QuotedIdentifiers;
+end;
+
+function TioDBConnectionInfo.GetCharSet: string;
+begin
+  Result := FCharSet;
+end;
+
+function TioDBConnectionInfo.GetCollation: String;
+begin
+  Result := FCollation;
+end;
+
+function TioDBConnectionInfo.GetKeyGenerationTime: TioKeyGenerationTime;
+begin
+  Result := FKeyGenerationTime;
+end;
+
+function TioDBConnectionInfo.GetQuotedIdentifiers: Boolean;
+begin
+  Result := FQuotedIdentifiers;
 end;
 
 end.

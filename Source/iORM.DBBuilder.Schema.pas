@@ -42,6 +42,9 @@ type
 
   TioDBBuilderSchema = class(TInterfacedObject, IioDBBuilderSchema)
   private
+    FQuotedIdentifiers: boolean;
+    FCharSet: String;
+    FCollation: string;
     FConnectionDefName: String;
     FIndexesEnabled, FForeignKeysEnabled: Boolean;
     FSequences: TioDBBuilderSchemaSequences;
@@ -52,6 +55,11 @@ type
     // DBExists
     function GetStatus: TioDBBuilderStatus;
     procedure SetStatus(const AValue: TioDBBuilderStatus);
+    function GetCollation: string;
+    function GetQuotedIdentifiers: boolean;
+  protected
+    property Collation: string read GetCollation;
+    property QuotedIdentifiers: boolean read GetQuotedIdentifiers;
   public
     constructor Create(const AConnectionDefName: String; const AIndexesEnabled, AForeignKeysEnabled: Boolean);
     destructor Destroy; override;
@@ -75,7 +83,7 @@ type
 implementation
 
 uses
-  iORM.DBBuilder.Factory, iORM.Exceptions, System.SysUtils, iORM.DB.ConnectionContainer, iORM.DB.Factory;
+  iORM.DBBuilder.Factory, iORM.Exceptions, System.SysUtils, iORM.DB.ConnectionContainer, iORM.DB.Factory, iORM.DB.Interfaces;
 
 { TioDBBuilderSchema }
 
@@ -85,6 +93,8 @@ begin
 end;
 
 constructor TioDBBuilderSchema.Create(const AConnectionDefName: String; const AIndexesEnabled, AForeignKeysEnabled: Boolean);
+var
+  LConnectionDef: IioConnectionDef;
 begin
   FScript := TStringList.Create;
   FSequences := TioDBBuilderSchemaSequences.Create;
@@ -94,6 +104,13 @@ begin
   FConnectionDefName := TioDBFActory.ConnectionManager.GetCurrentConnectionNameIfEmpty(AConnectionDefName);
   FWarnings := TStringList.Create;
   FTables := TioDBBuilderSchemaTables.Create;
+
+  // Get database sql related params
+  LConnectionDef := TioConnectionManager.GetConnectionDefByName(FConnectionDefName);
+
+  FCharSet := LConnectionDef.Params.Values['Charset'];
+  FCollation := LConnectionDef.Params.Values['Collation'];
+  FQuotedIdentifiers := LConnectionDef.Params.Values['QuotedIdentifiers'].ToBoolean;
 end;
 
 function TioDBBuilderSchema.DatabaseFileName: String;
@@ -134,6 +151,16 @@ end;
 function TioDBBuilderSchema.ForeignKeysEnabled: Boolean;
 begin
   Result := FForeignKeysEnabled;
+end;
+
+function TioDBBuilderSchema.GetCollation: string;
+begin
+  Result := FCollation;
+end;
+
+function TioDBBuilderSchema.GetQuotedIdentifiers: boolean;
+begin
+  Result := FQuotedIdentifiers;
 end;
 
 function TioDBBuilderSchema.GetStatus: TioDBBuilderStatus;

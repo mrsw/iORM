@@ -320,7 +320,7 @@ begin
   // -----------------------------------------------------------
   // Get and execute a query to retrieve the next ID for the inserting object
   // before the insert query (for Firebird/Interbase)
-  if (not ABlindInsertUpdate) and (TioConnectionManager.GetConnectionInfo(AContext.GetTable.GetConnectionDefName).KeyGenerationTime = kgtBeforeInsert) and AContext.IDIsNull
+  if (not ABlindInsertUpdate) and (TioConnectionManager.GetDBConnectionInfo(AContext.GetTable.GetConnectionDefName).KeyGenerationTime = kgtBeforeInsert) and AContext.IDIsNull
   then
   begin
     LQuery := TioDBFactory.QueryEngine.GetQueryNextID(AContext);
@@ -349,7 +349,7 @@ begin
   // -----------------------------------------------------------
   // Get and execute a query to retrieve the last ID generated
   // in the last insert query.
-  if (not ABlindInsertUpdate) and (TioConnectionManager.GetConnectionInfo(AContext.GetTable.GetConnectionDefName).KeyGenerationTime = kgtAfterInsert) and AContext.IDIsNull then
+  if (not ABlindInsertUpdate) and (TioConnectionManager.GetDBConnectionInfo(AContext.GetTable.GetConnectionDefName).KeyGenerationTime = kgtAfterInsert) and AContext.IDIsNull then
   begin
     LQuery := TioDBFactory.QueryEngine.GetQueryNextID(AContext);
     try

@@ -102,7 +102,7 @@ type
     property CurrentUserID: Integer read GetCurrentUserID write SetCurrentUserID;
   end;
 
-  TioConnectionManagerContainer = TDictionary<String, TioConnectionInfo>;
+  TioConnectionManagerContainer = TDictionary<String, IioConnectionInfo>;
   TioPerThreadCurrentConnectionName = TDictionary<TThreadID, IioCurrentConnectionInfo>;
   TioConnectionManagerRef = class of TioConnectionManager;
 
@@ -141,7 +141,9 @@ type
     class function GetCurrentConnectionName: String;
     class function GetCurrentConnectionNameIfEmpty(const AConnectionDefName: String): String;
     class function GetDatabaseFileName(const AConnectionName: String = IO_CONNECTIONDEF_DEFAULTNAME): String;
-    class function GetConnectionInfo(AConnectionName: String): TioConnectionInfo;
+    class function GetConnectionInfo(AConnectionName: String): IioConnectionInfo;
+    class function GetDBConnectionInfo(AConnectionName: String): IioDBConnectionInfo;
+    class function GetHTTPConnectionInfo(AConnectionName: String): IioHTTPConnectionInfo;
     class procedure SetShowHideWaitProc(const AShowWaitProc: TProc; const AHideWaitProc: TProc);
     class procedure ShowWaitProc;
     class procedure HideWaitProc;
@@ -286,7 +288,7 @@ end;
 
 class function TioConnectionManager.CheckConnectionName(AConnectionName: String): String;
 var
-  LConnectionInfo: TioConnectionInfo;
+  LConnectionInfo: IioConnectionInfo;
 begin
   // NB: Lasciare anche se il parametro è già defaultizzato perchè in alcune circostanze serve
   if IsEmptyConnectionName(AConnectionName) then
@@ -333,7 +335,7 @@ begin
   end;
 end;
 
-class function TioConnectionManager.GetConnectionInfo(AConnectionName: String): TioConnectionInfo;
+class function TioConnectionManager.GetConnectionInfo(AConnectionName: String): IioConnectionInfo;
 begin
   _Lock;
   try
@@ -357,6 +359,26 @@ begin
   finally
     _Unlock;
   end;
+end;
+
+class function TioConnectionManager.GetDBConnectionInfo(AConnectionName: String): IioDBConnectionInfo;
+var
+  LConnectionInfo: IioConnectionInfo;
+begin
+  LConnectionInfo := GetConnectionInfo(AConnectionName);
+
+  if not Supports(LConnectionInfo, IioDBConnectionInfo, Result) then
+    Result := nil;
+end;
+
+class function TioConnectionManager.GetHTTPConnectionInfo(AConnectionName: String): IioHTTPConnectionInfo;
+var
+  LConnectionInfo: IioConnectionInfo;
+begin
+  LConnectionInfo := GetConnectionInfo(AConnectionName);
+
+  if not Supports(LConnectionInfo, IioHTTPConnectionInfo, Result) then
+    Result := nil;
 end;
 
 class function TioConnectionManager.GetCurrentConnectionDef: IIoConnectionDef;
@@ -521,7 +543,8 @@ begin
     if ACharSet <> '' then
       Result.Params.Values['CharacterSet'] := ACharSet;
     // Add the connection type to the internal container
-    FConnectionManagerContainer.AddOrSetValue(AConnectionName, TioConnectionInfo.Create(AConnectionName, ctFirebird, APersistent, kgtBeforeInsert));
+    FConnectionManagerContainer.AddOrSetValue(AConnectionName, TioDBConnectionInfo.Create(AConnectionName, ctFirebird, APersistent,
+      kgtBeforeInsert));
   finally
     _Unlock
   end;
@@ -541,7 +564,8 @@ begin
     if ACharSet <> '' then
       Result.Params.Values['CharacterSet'] := ACharSet;
     // Add the connection type to the internal container
-    FConnectionManagerContainer.AddOrSetValue(AConnectionName, TioConnectionInfo.Create(AConnectionName, ctMySQL, APersistent, kgtUndefined));
+    FConnectionManagerContainer.AddOrSetValue(AConnectionName, TioDBConnectionInfo.Create(AConnectionName, ctMySQL, APersistent,
+      kgtUndefined));
   finally
     _Unlock;
   end;
@@ -559,8 +583,7 @@ begin
     if AAsDefault or (FCurrentConnectionInfo.CurrentConnectionName = '') then
       FCurrentConnectionInfo.CurrentConnectionName := AConnectionName;
     // Setup the connection info
-    LConnectionInfo := TioConnectionInfo.Create(AConnectionName, ctHTML, APersistent, kgtUndefined);
-    LConnectionInfo.BaseURL := ABaseURL;
+    LConnectionInfo := TioHTTPConnectionInfo.Create(AConnectionName, APersistent, ABaseURL);
     // Add the connection type to the internal container
     FConnectionManagerContainer.AddOrSetValue(AConnectionName, LConnectionInfo);
   finally
@@ -578,7 +601,7 @@ begin
     Result.Params.Database := ADatabase;
     Result.Params.Values['FailIfMissing'] := 'False';
     // Add the connection type to the internal container
-    FConnectionManagerContainer.AddOrSetValue(AConnectionName, TioConnectionInfo.Create(AConnectionName, ctSQLite, APersistent, kgtAfterInsert));
+    FConnectionManagerContainer.AddOrSetValue(AConnectionName, TioDBConnectionInfo.Create(AConnectionName, ctSQLite, APersistent, kgtAfterInsert));
   finally
     _Unlock;
   end;
@@ -598,7 +621,7 @@ begin
     Result.Params.UserName := AUserName;
     Result.Params.Password := APassword;
     // Add the connection type to the internal container
-    FConnectionManagerContainer.AddOrSetValue(AConnectionName, TioConnectionInfo.Create(AConnectionName, ctSQLServer, APersistent, kgtAfterInsert));
+    FConnectionManagerContainer.AddOrSetValue(AConnectionName, TioDBConnectionInfo.Create(AConnectionName, ctSQLServer, APersistent, kgtAfterInsert));
   finally
     _Unlock;
   end;

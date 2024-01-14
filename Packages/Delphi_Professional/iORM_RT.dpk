@@ -248,6 +248,10 @@ contains
   iORM.ETM.Factory in '..\..\Source\iORM.ETM.Factory.pas',
   iORM.ETM.Interceptor in '..\..\Source\iORM.ETM.Interceptor.pas',
   iORM.ETM.Interfaces in '..\..\Source\iORM.ETM.Interfaces.pas',
-  iORM.StdActions.CommonBehaviour in '..\..\Source\iORM.StdActions.CommonBehaviour.pas';
+  iORM.StdActions.CommonBehaviour in '..\..\Source\iORM.StdActions.CommonBehaviour.pas',
+  iORM.DB.ConnectionDef.SQLite in '..\..\Source\iORM.DB.ConnectionDef.SQLite.pas',
+  iORM.DB.ConnectionDef.Firebird in '..\..\Source\iORM.DB.ConnectionDef.Firebird.pas',
+  iORM.DB.ConnectionDef.MySql in '..\..\Source\iORM.DB.ConnectionDef.MySql.pas',
+  iORM.DB.ConnectionDef.HTTP in '..\..\Source\iORM.DB.ConnectionDef.HTTP.pas';
 
 end.
