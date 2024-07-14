@@ -248,6 +248,7 @@ contains
   iORM.ETM.Factory in '..\..\Source\iORM.ETM.Factory.pas',
   iORM.ETM.Interceptor in '..\..\Source\iORM.ETM.Interceptor.pas',
   iORM.ETM.Interfaces in '..\..\Source\iORM.ETM.Interfaces.pas',
-  iORM.StdActions.CommonBehaviour in '..\..\Source\iORM.StdActions.CommonBehaviour.pas';
+  iORM.StdActions.CommonBehaviour in '..\..\Source\iORM.StdActions.CommonBehaviour.pas',
+  iORM.MVVM.VMActionList in '..\..\Source\iORM.MVVM.VMActionList.pas';
 
 end.
