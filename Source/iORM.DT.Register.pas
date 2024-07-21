@@ -15,7 +15,7 @@ uses
   iORM.LiveBindings.PrototypeBindSource.Detail, DesignIntf, iORM.MVVM.ModelPresenter.Master, iORM.MVVM.ModelPresenter.Detail, iORM.MVVM.ModelDataSet,
   iORM.MVVM.ModelBindSource, iORM.MVVM.ViewModelBridge, iORM.MVVM.ViewContextProvider, System.Actions, iORM.StdActions.VCL, iORM.StdActions.FMX,
   iORM.DT.ViewModel.Wizard, iORM.MVVM.ViewModel, DesignEditors, iORM.StdActions.CloseQueryRepeater, iORM.Abstraction.uniGUI,
-  iORM.DT.CompAutoUses, iORM.MVVM.VMAction;
+  iORM.DT.CompAutoUses, iORM.MVVM.VMAction, iORM.DT.VMActnListCompEd, iORM.DT.VMActionEditor;
 
 
 
@@ -81,28 +81,54 @@ begin
   UnlistPublishedProperty(TioModelBindSource, 'OnCreateAdapter');
 
   // MVVM - VMActions
-  RegisterComponents('iORM - MVVM - VMActions', [TioVMAction]);
-  RegisterComponents('iORM - MVVM - VMActions - BS', [TioVMActionBSShowOrSelect]);
-  RegisterComponents('iORM - MVVM - VMActions - BS', [TioVMActionBSCloseQuery]);
-  RegisterComponents('iORM - MVVM - VMActions - BS - ETM', [TioVMActionBS_ETM_RevertToObject]);
-  RegisterComponents('iORM - MVVM - VMActions - BS - ETM', [TioVMActionBS_ETM_RevertToBindSource]);
-  RegisterComponents('iORM - MVVM - VMActions - BS - Paging', [TioVMActionBSNextPage]);
-  RegisterComponents('iORM - MVVM - VMActions - BS - Paging', [TioVMActionBSPrevPage]);
-  RegisterComponents('iORM - MVVM - VMActions - BS - WhereBuilder', [TioVMActionBSBuildWhere]);
-  RegisterComponents('iORM - MVVM - VMActions - BS - WhereBuilder', [TioVMActionBSClearWhere]);
-  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSSelectCurrent]);
+  RegisterNoIcon([
+    TioVMAction,
+    TioVMActionBSShowOrSelect,
+    TioVMActionBSCloseQuery,
+    TioVMActionBS_ETM_RevertToObject,
+    TioVMActionBS_ETM_RevertToBindSource,
+    TioVMActionBSNextPage,
+    TioVMActionBSPrevPage,
+    TioVMActionBSBuildWhere,
+    TioVMActionBSClearWhere,
+    TioVMActionBSSelectCurrent,
+    TioVMActionBSPersistenceSaveRevertPoint,
+    TioVMActionBSPersistenceClear,
+    TioVMActionBSPersistencePersist,
+    TioVMActionBSPersistenceRevert,
+    TioVMActionBSPersistenceRevertOrDelete,
+    TioVMActionBSPersistenceDelete,
+    TioVMActionBSPersistenceReload,
+    TioVMActionBSPersistenceAppend,
+    TioVMActionBSPersistenceInsert
+  ]);
+
   RegisterSelectionEditor(TioVMActionBSSelectCurrent, TioMVVMSelectionEditor);
-  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceSaveRevertPoint]);
-  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceClear]);
-  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistencePersist]);
-  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceRevert]);
-  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceRevertOrDelete]);
-  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceDelete]);
-  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceReload]);
-  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceAppend]);
   RegisterSelectionEditor(TioVMActionBSPersistenceAppend, TioMVVMSelectionEditor);
-  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceInsert]);
   RegisterSelectionEditor(TioVMActionBSPersistenceInsert, TioMVVMSelectionEditor);
+
+//  RegisterComponents('iORM - MVVM - VMActions', [TioVMAction]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS', [TioVMActionBSShowOrSelect]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS', [TioVMActionBSCloseQuery]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - ETM', [TioVMActionBS_ETM_RevertToObject]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - ETM', [TioVMActionBS_ETM_RevertToBindSource]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - Paging', [TioVMActionBSNextPage]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - Paging', [TioVMActionBSPrevPage]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - WhereBuilder', [TioVMActionBSBuildWhere]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - WhereBuilder', [TioVMActionBSClearWhere]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSSelectCurrent]);
+//  RegisterSelectionEditor(TioVMActionBSSelectCurrent, TioMVVMSelectionEditor);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceSaveRevertPoint]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceClear]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistencePersist]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceRevert]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceRevertOrDelete]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceDelete]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceReload]);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceAppend]);
+//  RegisterSelectionEditor(TioVMActionBSPersistenceAppend, TioMVVMSelectionEditor);
+//  RegisterComponents('iORM - MVVM - VMActions - BS - Persistence', [TioVMActionBSPersistenceInsert]);
+//  RegisterSelectionEditor(TioVMActionBSPersistenceInsert, TioMVVMSelectionEditor);
 
   // VCL standard actions
   RegisterActions('iORM - BS', [iORM.StdActions.Vcl.TioBSSelectCurrent], nil);
@@ -148,6 +174,10 @@ begin
 
   // StdActions common
   RegisterComponents('iORM - Other', [TioCloseQueryRepeater]);
+
+  RegisterComponents('iORM - Other', [TioVMActionList]);
+  RegisterComponentEditor(TioVMActionList, TioVMActionListCompEditor);
+  RegisterComponentEditor(TioVMAction, TioVMActionEditor);
 
   // IDE Wizards
   RegisterPackageWizard(TioViewModelWizard.Create);

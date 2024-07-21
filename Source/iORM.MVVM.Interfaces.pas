@@ -111,6 +111,10 @@ type
     procedure UnbindViewAction(const AViewAction: IioViewAction);
     function Update: Boolean;
     function Execute: Boolean;
+    // Category property
+    function GetCategory: string;
+    procedure SetCategory(const Value: string);
+    property Category: string read GetCategory write SetCategory;
     // Enabled property
     procedure SetEnabled(const Value: Boolean);
     function GetEnabled: Boolean;

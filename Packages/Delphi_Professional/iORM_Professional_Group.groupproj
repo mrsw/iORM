@@ -9,6 +9,9 @@
         <Projects Include="iORM_DT.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="..\..\..\..\..\..\..\..\Desktop\iORM Test\Runtime Pkgs Project\Project1.dproj">
+            <Dependencies/>
+        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -35,14 +38,23 @@
     <Target Name="iORM_DT:Make">
         <MSBuild Projects="iORM_DT.dproj" Targets="Make"/>
     </Target>
+    <Target Name="Project1">
+        <MSBuild Projects="..\..\..\..\..\..\..\..\Desktop\iORM Test\Runtime Pkgs Project\Project1.dproj"/>
+    </Target>
+    <Target Name="Project1:Clean">
+        <MSBuild Projects="..\..\..\..\..\..\..\..\Desktop\iORM Test\Runtime Pkgs Project\Project1.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Project1:Make">
+        <MSBuild Projects="..\..\..\..\..\..\..\..\Desktop\iORM Test\Runtime Pkgs Project\Project1.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="iORM_RT;iORM_DT"/>
+        <CallTarget Targets="iORM_RT;iORM_DT;Project1"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="iORM_RT:Clean;iORM_DT:Clean"/>
+        <CallTarget Targets="iORM_RT:Clean;iORM_DT:Clean;Project1:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="iORM_RT:Make;iORM_DT:Make"/>
+        <CallTarget Targets="iORM_RT:Make;iORM_DT:Make;Project1:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

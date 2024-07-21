@@ -41,6 +41,9 @@ contains
   iORM.DT.ViewModel.Wizard.Creator in '..\..\Source\iORM.DT.ViewModel.Wizard.Creator.pas',
   iORM.DT.Register in '..\..\Source\iORM.DT.Register.pas',
   iORM.DT.Wizard.Utils in '..\..\Source\iORM.DT.Wizard.Utils.pas',
-  iORM.DT.CompAutoUses in '..\..\Source\iORM.DT.CompAutoUses.pas';
+  iORM.DT.CompAutoUses in '..\..\Source\iORM.DT.CompAutoUses.pas',
+  iORM.DT.VMActnListCompEd in '..\..\Source\iORM.DT.VMActnListCompEd.pas',
+  iORM.DT.VMActnListEditor in '..\..\Source\iORM.DT.VMActnListEditor.pas' {ioVMActionListEditor},
+  iORM.DT.VMActionEditor in '..\..\Source\iORM.DT.VMActionEditor.pas';
 
 end.

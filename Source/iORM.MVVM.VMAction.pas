@@ -46,6 +46,39 @@ type
   // BEGIN: MVVM BASE VIEW MODEL ACTION
   // =================================================================================================
 
+  TioVMActionCustom = class;
+
+  TioCustomVMActionList = class(TComponent)
+  private
+    FActions: TList<TioVMActionCustom>;
+    function GetAction(Index: Integer): TioVMActionCustom;
+    function GetActionCount: Integer;
+    procedure SetAction(Index: Integer; const Value: TioVMActionCustom);
+  protected
+    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
+  public
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+
+    procedure AddAction(const AAction: TioVMActionCustom);
+    procedure RemoveAction(const AAction: TioVMActionCustom);
+//    function EnumByCategory(Proc: TEnumActionListEvent;
+//                      const Category: string;
+//                      const IncludeSubCategory: Boolean = True): boolean; overload;
+//    function EnumByCategory(Proc: TEnumActionListRef;
+//                      const Category: string;
+//                      const IncludeSubCategory: Boolean = True): boolean; overload;
+
+
+    property Actions[Index: Integer]: TioVMActionCustom read GetAction write SetAction; default;
+    property ActionCount: Integer read GetActionCount;
+  end;
+
+  TioVMActionList = clasS(TioCustomVMActionList)
+
+  end;
+
+
   TioVMActionCustom = class (TComponent, IioVMAction)
   strict private
     FBindedViewActionsContainer: TList<IioViewAction>;
@@ -60,7 +93,9 @@ type
     function Get_Version: String;
     procedure _InternalExecute; virtual;
     procedure _InternalUpdate; virtual;
-  strict protected
+  strict
+  private
+    FCategory: string; protected
     procedure _InternalExecuteStdAction; virtual;
     procedure _InternalUpdateStdAction; virtual;
     procedure _UpdateOriginal;
@@ -73,6 +108,8 @@ type
     function GetName: TComponentName;
     function GetOwnerComponent: TComponent;
     function GetVisible: Boolean;
+    function GetCategory: string;
+    procedure SetCategory(const Value: string);
     procedure SetEnabled(const Value: Boolean);
     procedure SetExecutionMode(const Value: TioActionExecutionMode);
     procedure SetName(const Value: TComponentName); reintroduce;
@@ -89,13 +126,28 @@ type
     property BeforeExecute: TNotifyEvent read FBeforeExecute write FBeforeExecute;
     property CanExecute: TioStdActionCanExecuteEvent read FCanExecute write FCanExecute;
     property OnUpdate: TNotifyEvent read FOnUpdate write FOnUpdate;
+  private
+    FActionList: TioCustomVMActionList;
+    procedure SetActionList(const Value: TioCustomVMActionList);
+  protected
+    procedure ReadState(Reader: TReader); override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+
+    function GetParentComponent: TComponent; override;
+    procedure SetParentComponent(AParent: TComponent); override;
+    function HasParent: Boolean; override;
     function HandlesTarget(Target: TObject): Boolean; virtual;
     function Execute: Boolean; virtual;
     function Update: Boolean; virtual;
+
+    property ActionList: TioCustomVMActionList read FActionList write SetActionList;
+  published
+    property Category: string read GetCategory write SetCategory;
   end;
+
+  TioVMActionCustomClass = class of TioVMActionCustom;
 
   TioVMAction = class(TioVMActionCustom)
   strict private
@@ -706,7 +758,8 @@ implementation
 uses
   System.SysUtils, iORM.Utilities, iORM.Exceptions, iORM, System.Rtti,
   iORM.RttiContext.Factory, iORM.StdActions.CloseQueryActionRegister,
-  iORM.Abstraction, iORM.ETM.Engine, iORM.StdActions.CommonBehaviour;
+  iORM.Abstraction, iORM.ETM.Engine, iORM.StdActions.CommonBehaviour,
+  iORM.MVVM.ViewModel;
 
 { TioVMActionCustom }
 
@@ -714,12 +767,13 @@ constructor TioVMActionCustom.Create(AOwner: TComponent);
 begin
   inherited;
   FExecutionMode := emActive;
+  FCategory := EmptyStr;
   FEnabled := True;
   FVisible := True;
   FBindedViewActionsContainer := TList<IioViewAction>.Create;
   // Solleva una eccezione se non siamo su un ViewModel
-  if not Supports(Owner, IioViewModel) then
-    raise EioException.Create(ClassName, 'Create', Format('Component "%s" can only be used on class "TioViewModel" or its descendants.', [ClassName]));
+//  if not Supports(Owner, IioViewModel) then
+//    raise EioException.Create(ClassName, 'Create', Format('Component "%s" can only be used on class "TioViewModel" or its descendants.', [ClassName]));
 end;
 
 destructor TioVMActionCustom.Destroy;
@@ -739,6 +793,11 @@ function TioVMActionCustom.Update: Boolean;
 begin
   _UpdateOriginal;
   Result := False;
+end;
+
+function TioVMActionCustom.GetCategory: string;
+begin
+  Result := FCategory;
 end;
 
 function TioVMActionCustom.GetEnabled: Boolean;
@@ -761,6 +820,14 @@ begin
   Result := inherited Owner;
 end;
 
+function TioVMActionCustom.GetParentComponent: TComponent;
+begin
+  if ActionList <> nil then
+    Result := ActionList
+  else
+    Result := inherited GetParentComponent;
+end;
+
 function TioVMActionCustom.GetVisible: Boolean;
 begin
   Result := FVisible;
@@ -774,6 +841,21 @@ end;
 function TioVMActionCustom.HandlesTarget(Target: TObject): Boolean;
 begin
   Result := False;
+end;
+
+function TioVMActionCustom.HasParent: Boolean;
+begin
+  if ActionList <> nil then
+    Result := True
+  else
+    Result := inherited HasParent;
+end;
+
+procedure TioVMActionCustom.ReadState(Reader: TReader);
+begin
+  inherited ReadState(Reader);
+  if Reader.Parent is TioVMActionList then
+    ActionList := TioVMActionList(Reader.Parent);
 end;
 
 procedure TioVMActionCustom._ExecuteOriginal;
@@ -874,6 +956,22 @@ begin
     UnbindViewAction(FBindedViewActionsContainer[I]);
 end;
 
+procedure TioVMActionCustom.SetActionList(const Value: TioCustomVMActionList);
+begin
+  if Value <> ActionList then
+  begin
+    if Value <> nil then
+      ActionList.RemoveAction(Self);
+    if Value <> nil then
+      Value.AddAction(Self);
+  end;
+end;
+
+procedure TioVMActionCustom.SetCategory(const Value: string);
+begin
+  FCategory := Value;
+end;
+
 procedure TioVMActionCustom.SetEnabled(const Value: Boolean);
 var
   LViewAction: IioViewAction;
@@ -895,6 +993,12 @@ end;
 procedure TioVMActionCustom.SetName(const Value: TComponentName);
 begin
   inherited SetName(Value);
+end;
+
+procedure TioVMActionCustom.SetParentComponent(AParent: TComponent);
+begin
+  if not (csLoading in ComponentState) and (AParent is TioCustomVMActionList) then
+    ActionList := TioCustomVMActionList(AParent);
 end;
 
 procedure TioVMActionCustom.SetVisible(const Value: Boolean);
@@ -2178,5 +2282,75 @@ begin
   inherited;
   Enabled := Assigned(FOnExecute);
 end;
+
+{ TioCustomVMActionList }
+
+procedure TioCustomVMActionList.AddAction(const AAction: TioVMActionCustom);
+begin
+  FActions.Add(AAction);
+  AAction.FActionList := Self;
+  AAction.FreeNotification(Self);
+end;
+
+constructor TioCustomVMActionList.Create(AOwner: TComponent);
+begin
+  inherited;
+
+  if not Owner.InheritsFrom(TioViewModel) then
+    raise EioException.Create(ClassName, 'Create',
+      Format('Component "%s" can only be used on class "TioViewModel" or its descendants, not "%s".', [ClassName, AOwner.ClassName]));
+
+  FActions := TList<TioVMActionCustom>.Create;
+end;
+
+procedure TioCustomVMActionList.RemoveAction(const AAction: TioVMActionCustom);
+begin
+  if (FActions <> nil) and (FActions.Remove(AAction) >= 0) then
+  begin
+    AAction.RemoveFreeNotification(Self);
+//    AAction.FActionList := nil;
+  end;
+end;
+
+destructor TioCustomVMActionList.Destroy;
+begin
+  if FActions <> nil then
+    while FActions.Count > 0 do
+      FActions.Last.Free;
+
+  FreeAndNil(FActions);
+
+  inherited;
+end;
+
+function TioCustomVMActionList.GetAction(Index: Integer): TioVMActionCustom;
+begin
+  Result := FActions[Index];
+end;
+
+function TioCustomVMActionList.GetActionCount: Integer;
+begin
+  Result := FActions.Count;
+end;
+
+procedure TioCustomVMActionList.Notification(AComponent: TComponent;
+  Operation: TOperation);
+begin
+  inherited Notification(AComponent, Operation);
+
+  if Operation = opRemove then
+  begin
+    if (AComponent is TioVMActionCustom) then
+      RemoveAction(TioVMActionCustom(AComponent));
+  end;
+end;
+
+procedure TioCustomVMActionList.SetAction(Index: Integer; const Value: TioVMActionCustom);
+begin
+  FActions[Index].Assign(Value);
+end;
+
+initialization
+  RegisterClasses([TioVMActionCustom, TioVMAction, TioVMActionList]);
 
 end.
