@@ -357,7 +357,7 @@ type
     constructor Create(const AIndexOrientation: TioIndexOrientation = ioAscending; const AUnique: Boolean = False); overload;
 
     property ExplicitName: boolean read FExplicitName;  // Carlo Marona (2025-10-21): Property added to know when the index name was passed by the user or set by the iORM
-    property IndexName: String read FIndexName write FIndexName;  // Carlo Marona (2025-10-17): Added write
+    property IndexName: String read FIndexName;
     property CommaSepFieldList: String read FCommaSepFieldList write FCommaSepFieldList;
     property IndexOrientation: TioIndexOrientation read FIndexOrientation;
     property Unique: Boolean read FUnique;
@@ -779,23 +779,27 @@ begin
   if AIndexName.IsEmpty then
     raise EioGenericException.Create(ClassName, 'Create', 'No index name specified.');
 
-  inherited Create;
+  Create(ACommaSepFieldList, AIndexOrientation, AUnique);
   FIndexName := AIndexName;
   FExplicitName := True;
-  FCommaSepFieldList := ACommaSepFieldList;
-  FIndexOrientation := AIndexOrientation;
-  FUnique := AUnique;
+//  FCommaSepFieldList := ACommaSepFieldList;
+//  FIndexOrientation := AIndexOrientation;
+//  FUnique := AUnique;
 end;
 
 constructor ioIndex.Create(ACommaSepFieldList: String; const AIndexOrientation: TioIndexOrientation; const AUnique: Boolean);
 begin
+  // Carlo Marona (2025-11-18): added check for empty fields list
+  if ACommaSepFieldList.IsEmpty then
+    raise EioGenericException.Create(ClassName, 'Create', 'No fields list specified.');
+
   // Carlo Marona (2025-10-21)
-  inherited Create;
-  FIndexName := EmptyStr;
-  FExplicitName := False;
+  Create(AIndexOrientation, AUnique);
+//  FIndexName := EmptyStr;
+  //FExplicitName := False;
   FCommaSepFieldList := ACommaSepFieldList;
-  FIndexOrientation := AIndexOrientation;
-  FUnique := AUnique;
+//  FIndexOrientation := AIndexOrientation;
+//  FUnique := AUnique;
 
 //  Self.Create('', ACommaSepFieldList, AIndexOrientation, AUnique);
 end;

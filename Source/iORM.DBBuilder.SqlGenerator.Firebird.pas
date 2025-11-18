@@ -338,11 +338,11 @@ function TioDBBuilderSqlGenFirebird.BuildIndexModifiedSql(const ATable: IioDBBui
 begin
   Result := Format(
     'select' + sLineBreak +
-    '  rdb$indices.rdb$index_name,' + sLineBreak +
-    '  rdb$indices.rdb$relation_name,' + sLineBreak +
-    '  rdb$indices.rdb$unique_flag,' + sLineBreak +
-    '  rdb$indices.rdb$index_type,' + sLineBreak +
-    '  rdb$index_segments.rdb$field_name' + sLineBreak +
+    '  rdb$indices.rdb$index_name as "IndexName",' + sLineBreak +
+    '  rdb$indices.rdb$relation_name as "TableName",' + sLineBreak +
+    '  rdb$indices.rdb$unique_flag as "UniqueFlag",' + sLineBreak +
+    '  rdb$indices.rdb$index_type as "IndexType",' + sLineBreak +
+    '  rdb$index_segments.rdb$field_name as "FieldName"' + sLineBreak +
     'from' + sLineBreak +
     '  rdb$index_segments right outer join rdb$indices on (rdb$index_segments.rdb$index_name = rdb$indices.rdb$index_name)' + sLineBreak +
     'where' + sLineBreak +

@@ -490,18 +490,20 @@ begin
 
   while not (Result or LQuery.Eof) do
   begin
-    if not AIndex.CommaSepFieldList.Contains(LQuery.Fields.FieldByName('rdb$index_segments.rdb$field_name').AsString) then
+    if not AIndex.CommaSepFieldList.ToUpper.Contains(LQuery.Fields.FieldByName('FieldName').AsString.ToUpper) then
       AIndex.AddChange(icFields);
 
-    if LQuery.Fields.FieldByName('rdb$index_segments.rdb$unique_flag').AsBoolean <> AIndex.Unique then
+    if LQuery.Fields.FieldByName('UniqueFlag').AsInteger <> AIndex.Unique.ToInteger then
       AIndex.AddChange(icUnique);
 
     // Carlo Marona: Firebird index type can be 0 = Ascending, 1 = Descending. iORM orientation actually uses same values, but in the future, changes must be made carefully,
     //               because this condition could be broken.
-    if LQuery.Fields.FieldByName('rdb$index_segments.rdb$index_type').AsInteger <> Ord(AIndex.IndexOrientation) then
+    if LQuery.Fields.FieldByName('IndexType').AsInteger <> Ord(AIndex.IndexOrientation) then
       AIndex.AddChange(icOrientation);
 
     Result := AIndex.Changes <> [];
+
+    LQuery.Next;
   end;
 end;
 
