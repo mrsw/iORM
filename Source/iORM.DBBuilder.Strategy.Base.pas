@@ -120,12 +120,12 @@ begin
         case LFK.Status of
           stCreate:
             begin
-              AScript.Add(SqlGenerator.BuildAddForeignKeySql(LTable, LFK));
+              AScript.Schema.Add(SqlGenerator.BuildAddForeignKeySql(LTable, LFK));
             end;
           stUpdate:
             begin
-              AScript.Add(SqlGenerator.BuildDropForeignKeySql(LTable, LFK));
-              AScript.Add(SqlGenerator.BuildAddForeignKeySql(LTable, LFK));
+              AScript.Schema.Add(SqlGenerator.BuildDropForeignKeySql(LTable, LFK));
+              AScript.Schema.Add(SqlGenerator.BuildAddForeignKeySql(LTable, LFK));
             end;
         end;
       end;
@@ -148,12 +148,12 @@ begin
     case LIndex.Status of
       stCreate:
         begin
-          AScript.Add(SqlGenerator.BuildAddIndexSql(ATable, LIndex));
+          AScript.Schema.Add(SqlGenerator.BuildAddIndexSql(ATable, LIndex));
         end;
       stUpdate:
         begin
-          AScript.Add(SqlGenerator.BuildDropIndexSql(ATable, LIndex));
-          AScript.Add(SqlGenerator.BuildAddIndexSql(ATable, LIndex));
+          AScript.Schema.Add(SqlGenerator.BuildDropIndexSql(ATable, LIndex));
+          AScript.Schema.Add(SqlGenerator.BuildAddIndexSql(ATable, LIndex));
         end;
     end;
   end;
@@ -167,7 +167,7 @@ begin
   if not Assigned(ATable) then
     raise EioArgumentNilException.Create(ClassName, 'AlterTable', 'ATable is not assigned.');
 
-  AScript.AddTitle(Format('Altering table ''%s''', [ATable.Name]));
+  AScript.Schema.AddTitle(Format('Altering table ''%s''', [ATable.Name]));
 end;
 
 constructor TioDBBuilderStrategyBase.Create(const AConnectionDefName: string; const ASchema: IioDBBuilderSchema; const ASqlGenerator: IioDBBuilderSqlGenerator);
@@ -190,7 +190,7 @@ begin
   if not Assigned(AScript) then
     raise EioArgumentNilException.Create(ClassName, 'CreateForeignKeys', 'AScript is not assigned.');
 
-  AScript.AddTitle('Creating foreign keys');
+  AScript.Schema.AddTitle('Creating foreign keys');
 
   for LTable in Schema.Tables.Values do
     CreateTableForeignKeys(AScript, LTable);
@@ -207,7 +207,7 @@ begin
     raise EioArgumentNilException.Create(ClassName, 'CreateForeignKeys', 'ATable is not assigned.');
 
   for LForeignKey in ATable.ForeignKeys.Values do
-    AScript.Add(SqlGenerator.BuildAddForeignKeySql(ATable, LForeignKey));
+    AScript.Schema.Add(SqlGenerator.BuildAddForeignKeySql(ATable, LForeignKey));
 end;
 
 procedure TioDBBuilderStrategyBase.CreateIndexes(const AScript: IioDBBuilderSqlScript);
@@ -217,14 +217,14 @@ begin
   if not Assigned(AScript) then
     raise EioArgumentNilException.Create(ClassName, 'CreateIndexes', 'AScript is not assigned.');
 
-  AScript.AddTitle('Creating indexes');
+  AScript.Schema.AddTitle('Creating indexes');
 
-  AScript.IncIndentationLevel;
+  AScript.Schema.IncIndentationLevel;
 
   for LTable in Schema.Tables.Values do
     CreateTableIndexes(AScript, LTable);
 
-  AScript.DecIndentationLevel;
+  AScript.Schema.DecIndentationLevel;
 end;
 
 procedure TioDBBuilderStrategyBase.CreateTableIndexes(const AScript: IioDBBuilderSqlScript; const ATable: IioDBBuilderSchemaTable);
@@ -240,11 +240,11 @@ begin
     if LIndex.Status = stUpdate then
     begin
       // If the index was changed, drops the old one then recreate it with updates
-      AScript.Add(SqlGenerator.BuildDropIndexSql(SqlGenerator.BuildIndexNameSql(ATable, LIndex)));
+      AScript.Schema.Add(SqlGenerator.BuildDropIndexSql(SqlGenerator.BuildIndexNameSql(ATable, LIndex)));
     end;
 
     if (ATable.Status = stCreate) or (LIndex.Status in [stCreate, stUpdate]) then
-      AScript.Add(SqlGenerator.BuildAddIndexSql(ATable, LIndex));
+      AScript.Schema.Add(SqlGenerator.BuildAddIndexSql(ATable, LIndex));
   end;
 end;
 
@@ -266,12 +266,12 @@ begin
     case LField.Status of
       stCreate:
         begin
-          AScript.Add(LComma + SqlGenerator.BuildAddFieldSql(LField));
+          AScript.Schema.Add(LComma + SqlGenerator.BuildAddFieldSql(LField));
           LComma := ', ';
         end;
       stUpdate:
         begin
-          AScript.Add(LComma + SqlGenerator.BuildAlterFieldSql(LField));
+          AScript.Schema.Add(LComma + SqlGenerator.BuildAlterFieldSql(LField));
           LComma := ', ';
         end;
     end;
@@ -304,7 +304,7 @@ begin
   if not Assigned(ATable) then
     raise EioArgumentNilException.Create(ClassName, 'CreateTable', 'ATable is not assigned.');
 
-  AScript.AddTitle(Format('Creating table ''%s''', [ATable.Name]));
+  AScript.Schema.AddTitle(Format('Creating table ''%s''', [ATable.Name]));
 end;
 
 procedure TioDBBuilderStrategyBase.CreateTables(const AScript: IioDBBuilderSqlScript);
@@ -323,7 +323,7 @@ begin
   if Schema.Status = stCreate then
     Exit;
 
-  AScript.AddTitle('Dropping foreign keys');
+  AScript.Schema.AddTitle('Dropping foreign keys');
 end;
 
 procedure TioDBBuilderStrategyBase.DropIndexes(const AScript: IioDBBuilderSqlScript);
@@ -334,7 +334,7 @@ begin
   if Schema.Status = stCreate then
     Exit;
 
-  AScript.AddTitle('Dropping indexes');
+  AScript.Schema.AddTitle('Dropping indexes');
 end;
 
 procedure TioDBBuilderStrategyBase.DropTableIndexes(const AScript: IioDBBuilderSqlScript; const ATable: IioDBBuilderSchemaTable);
@@ -348,7 +348,7 @@ begin
   if Schema.Status = stCreate then
     Exit;
 
-  AScript.AddTitle('Dropping indexes');
+  AScript.Schema.AddTitle('Dropping indexes');
 end;
 
 procedure TioDBBuilderStrategyBase.GenerateCreateDatabaseScript(const AScript: IioDBBuilderSqlScript);
@@ -361,7 +361,7 @@ begin
   AScript.ScriptBegin(ConnectionDefName, TioConnectionManager.GetConnectionDefByName(ConnectionDefName).Params.DriverID);
 
   if Schema.WarningExists then
-    AScript.AddWarnings(Schema.Warnings);
+    AScript.Schema.AddWarnings(Schema.Warnings);
 
   GenerateDatabaseObjects(AScript, True);
 
@@ -378,7 +378,7 @@ begin
   AScript.ScriptBegin(ConnectionDefName, TioConnectionManager.GetConnectionDefByName(ConnectionDefName).Params.DriverID);
 
   if Schema.WarningExists then
-    AScript.AddWarnings(Schema.Warnings);
+    AScript.Schema.AddWarnings(Schema.Warnings);
 
   GenerateDatabaseObjects(AScript, False);
 

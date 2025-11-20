@@ -202,8 +202,8 @@ type
     property Tables: TioDBBuilderSchemaTables read GetTables;
   end;
 
-  IioDBBuilderSqlScript = interface
-    ['{714A36B3-A44C-4D1D-A046-BC6222DCE2B7}']
+  IioDBBuilderSqlScriptSection = interface
+    ['{DF2D64EF-3576-49CF-B803-3D10D7A93816}']
 
     function GetCurrentIndentation: TioIndentation;
     function GetSQL: TStringList;
@@ -215,14 +215,35 @@ type
     procedure AddTitle(const AText: String);
     procedure AddWarning(const AText: String);
     procedure AddWarnings(const WarningsList: TStrings);
-
-    procedure ScriptBegin(const AConnectionDefName, ADriverID: string);
-    procedure ScriptEnd;
+    procedure Clear;
 
     procedure DecIndentationLevel;
     procedure IncIndentationLevel;
 
     property CurrentIndentation: TioIndentation read GetCurrentIndentation;
+    property SQL: TStringList read GetSQL;
+  end;
+
+
+  IioDBBuilderSqlScript = interface
+    ['{714A36B3-A44C-4D1D-A046-BC6222DCE2B7}']
+
+    function GetSQL: TStringList;
+    function GetFooter: IioDBBuilderSqlScriptSection;
+    function GetHeader: IioDBBuilderSqlScriptSection;
+    function GetSchema: IioDBBuilderSqlScriptSection;
+
+    // Full script clear
+    procedure Clear;
+    procedure SaveToFile(const AFileName: string);
+    // This method works on header section
+    procedure ScriptBegin(const AConnectionDefName, ADriverID: string);
+    // This method works on footer section
+    procedure ScriptEnd;
+
+    property Header: IioDBBuilderSqlScriptSection read GetHeader;
+    property Schema: IioDBBuilderSqlScriptSection read GetSchema;
+    property Footer: IioDBBuilderSqlScriptSection read GetFooter;
     property SQL: TStringList read GetSQL;
   end;
 
