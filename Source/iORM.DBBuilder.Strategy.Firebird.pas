@@ -98,16 +98,16 @@ procedure TioDBBuilderStrategyFirebird.AlterTable(const AScript: IioDBBuilderSql
 begin
   if taFields in ATable.Changes then
   begin
-    AScript.Add(SqlGenerator.BuildBeginAlterTableSql(ATable));
-    AScript.IncIndentationLevel;
+    AScript.Schema.Add(SqlGenerator.BuildBeginAlterTableSql(ATable));
+    AScript.Schema.IncIndentationLevel;
     AddOrAlterFields(AScript, ATable);
-    AScript.DecIndentationLevel;
-    AScript.Add(SqlGenerator.BuildEndAlterTableSql(ATable));
+    AScript.Schema.DecIndentationLevel;
+    AScript.Schema.Add(SqlGenerator.BuildEndAlterTableSql(ATable));
   end;
 
   if Schema.IndexesEnabled and (taIndexes in ATable.Changes) then
   begin
-    AScript.AddEmpty;
+    AScript.Schema.AddEmpty;
     AddOrAlterIndexes(AScript, ATable);
   end;
 end;
@@ -132,7 +132,7 @@ begin
   if Schema.Sequences.Count = 0 then
     Exit;
 
-  AScript.AddTitle('Creating sequences (if empty, no sequence needs to be created)');
+  AScript.Schema.AddTitle('Creating sequences (if empty, no sequence needs to be created)');
 
   if not Assigned(FBSqlGenerator) then
     raise EioGenericException.Create(ClassName, 'CreateSequences', 'SqlGenerator doesn''t support IioDBBuilderSqlGeneratorFirebird interface.');
@@ -141,7 +141,7 @@ begin
   begin
     // Check if sequence exists, then create it
     if (Schema.Status = stCreate) or (not SequenceExists(LSequence)) then
-      AScript.Add(FBSqlGenerator.BuildAddSequenceSql(LSequence, Schema.Status = stCreate));
+      AScript.Schema.Add(FBSqlGenerator.BuildAddSequenceSql(LSequence, Schema.Status = stCreate));
   end;
 end;
 
@@ -156,23 +156,23 @@ begin
   if not Assigned(ATable) then
     raise EioArgumentNilException.Create(ClassName, 'CreateTable', 'ATable is not assigned.');
 
-  AScript.AddTitle(Format('Creating table ''%s''', [ATable.Name]));
+  AScript.Schema.AddTitle(Format('Creating table ''%s''', [ATable.Name]));
 
   if (Schema.Status = stCreate) or not SequenceExists(ATable.GetSequenceName) then
     CreateTableSequence(AScript, ATable);
 
-  AScript.AddEmpty;
-  AScript.Add(SqlGenerator.BuildBeginCreateTableSql(ATable));
-  Ascript.IncIndentationLevel;
-  AScript.Add(SqlGenerator.BuildCreateFieldsSql(ATable, AScript.CurrentIndentation), False);
-  AScript.DecIndentationLevel;
-  AScript.Add(SqlGenerator.BuildEndCreateTableSql(ATable));
-  AScript.AddEmpty;
-  AScript.Add(SqlGenerator.BuildAddPrimaryKeySql(ATable));
+  AScript.Schema.AddEmpty;
+  AScript.Schema.Add(SqlGenerator.BuildBeginCreateTableSql(ATable));
+  Ascript.Schema.IncIndentationLevel;
+  AScript.Schema.Add(SqlGenerator.BuildCreateFieldsSql(ATable, AScript.Schema.CurrentIndentation), False);
+  AScript.Schema.DecIndentationLevel;
+  AScript.Schema.Add(SqlGenerator.BuildEndCreateTableSql(ATable));
+  AScript.Schema.AddEmpty;
+  AScript.Schema.Add(SqlGenerator.BuildAddPrimaryKeySql(ATable));
 
   if Schema.IndexesEnabled then
   begin
-    AScript.AddEmpty;
+    AScript.Schema.AddEmpty;
     CreateTableIndexes(AScript, ATable);
   end;
 end;
@@ -193,7 +193,7 @@ begin
 
   // Check if sequence exists, then create it
   if (ATable.Status = stCreate) or (not SequenceExists(ATable.GetSequenceName)) then
-    AScript.Add(FBSqlGenerator.BuildAddSequenceSql(ATable.GetSequenceName, ATable.Status = stCreate));
+    AScript.Schema.Add(FBSqlGenerator.BuildAddSequenceSql(ATable.GetSequenceName, ATable.Status = stCreate));
 end;
 
 function TioDBBuilderStrategyFirebird.DatabaseExists: Boolean;
@@ -233,7 +233,7 @@ begin
 
   while not LQuery.Eof do
   begin
-    AScript.Add(SqlGenerator.BuildDropForeignKeySql(LQuery.Fields.FieldByName('table_name').AsString,
+    AScript.Schema.Add(SqlGenerator.BuildDropForeignKeySql(LQuery.Fields.FieldByName('table_name').AsString,
       LQuery.Fields.FieldByName('constraint_name').AsString));
     LQuery.Next;
   end;
@@ -247,7 +247,7 @@ begin
 
   while not LQuery.Eof do
   begin
-    AScript.Add(SqlGenerator.BuildDropIndexSql(LQuery.Fields[0].AsString));
+    AScript.Schema.Add(SqlGenerator.BuildDropIndexSql(LQuery.Fields[0].AsString));
     LQuery.Next;
   end;
 end;
@@ -273,7 +273,7 @@ begin
 
   while not LQuery.Eof do
   begin
-    AScript.Add(SqlGenerator.BuildDropIndexSql(LQuery.Fields[0].AsString));
+    AScript.Schema.Add(SqlGenerator.BuildDropIndexSql(LQuery.Fields[0].AsString));
     LQuery.Next;
   end;
 end;
@@ -444,10 +444,10 @@ begin
   else
   begin
     // DropForeignKeys(AScript);  // Carlo Marona (2025-10-20): Removed because now the analisys was updated to take in account foreign keys changes
-    AScript.AddEmpty;
+    AScript.Schema.AddEmpty;
     //DropIndexes(AScript);  // Carlo Marona: Create index method was updated to check if index exists before create so there's no need to remove all indexes blindly
     CreateOrAlterTables(AScript);
-    AScript.AddEmpty;
+    AScript.Schema.AddEmpty;
     // CreateSequences(AScript);  // Carlo Marona: Create sequence was moved in CreateTable method so the create table method creates all table components
 
     //if Schema.IndexesEnabled then  // Carlo Marona: Create indexes was moved in CreateTable method so the create table method creates all table components

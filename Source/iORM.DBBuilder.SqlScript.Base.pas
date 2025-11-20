@@ -13,7 +13,7 @@ uses
 
 
 type
-  TioDBBuilderSqlScript = class(TInterfacedObject, IioDBBuilderSqlScript)
+  TioDBBuilderScriptSection = class(TInterfacedObject, IioDBBuilderSqlScriptSection)
   private
     FIndentation: TioIndentation;
     FScript: TStringList;
@@ -33,16 +33,47 @@ type
     procedure AddTitle(const AText: String); virtual;
     procedure AddWarning(const AText: String); virtual;
     procedure AddWarnings(const WarningsList: TStrings); virtual;
+    procedure Clear;
 
     procedure DecIndentationLevel;
     procedure IncIndentationLevel;
 
-    procedure ScriptBegin(const AConnectionDefName, ADriverID: string); virtual;
-    procedure ScriptEnd; virtual;
-
     property CurrentIndentation: TioIndentation read GetCurrentIndentation;
     property SQL: TStringList read GetSQL;
   end;
+
+
+  TioDBBuilderSqlScript = class(TInterfacedObject, IioDBBuilderSqlScript)
+  private
+    FFullScript: TStringList;
+    FSchemaScript: IioDBBuilderSqlScriptSection;
+    FScriptHeader: IioDBBuilderSqlScriptSection;
+    FScriptFooter: IioDBBuilderSqlScriptSection;
+    function GetSQL: TStringList;
+    function GetFooter: IioDBBuilderSqlScriptSection;
+    function GetHeader: IioDBBuilderSqlScriptSection;
+    function GetSchema: IioDBBuilderSqlScriptSection;
+  public
+    constructor Create(const AIndentationWidth: integer = SCRIPT_INDENTATION_WIDTH; const ASeparatorLength: integer = SCRIPT_SEPARATOR_LENGTH);
+    destructor Destroy; override;
+
+    // Full script clear
+    procedure Clear;
+    procedure SaveToFile(const AFileName: string);
+    // This method works on header section
+    procedure ScriptBegin(const AConnectionDefName, ADriverID: string); virtual;
+    // This method works on footer section
+    procedure ScriptEnd; virtual;
+
+    property Header: IioDBBuilderSqlScriptSection read GetHeader;
+    property Schema: IioDBBuilderSqlScriptSection read GetSchema;
+    property Footer: IioDBBuilderSqlScriptSection read GetFooter;
+    property SQL: TStringList read GetSQL;
+  end;
+
+
+
+
 
 implementation
 
@@ -54,9 +85,9 @@ uses
   ;
 
 
-{ TioDBBuilderSqlScript }
+{ TioDBBuilderScriptSection }
 
-procedure TioDBBuilderSqlScript.Add(const AText: String; const UseIndent: boolean = True);
+procedure TioDBBuilderScriptSection.Add(const AText: String; const UseIndent: boolean = True);
 begin
   if UseIndent then
     FScript.Add(GetIndentation + AText)
@@ -64,22 +95,22 @@ begin
     FScript.Add(AText);
 end;
 
-procedure TioDBBuilderSqlScript.AddComment(const AText: String);
+procedure TioDBBuilderScriptSection.AddComment(const AText: String);
 begin
   FScript.Add('-- ' + AText);
 end;
 
-procedure TioDBBuilderSqlScript.AddEmpty;
+procedure TioDBBuilderScriptSection.AddEmpty;
 begin
   FScript.Add('');
 end;
 
-procedure TioDBBuilderSqlScript.AddSeparator;
+procedure TioDBBuilderScriptSection.AddSeparator;
 begin
   FScript.Add(StringOfChar('-', FSeparatorLength));
 end;
 
-procedure TioDBBuilderSqlScript.AddTitle(const AText: String);
+procedure TioDBBuilderScriptSection.AddTitle(const AText: String);
 begin
   AddEmpty;
   AddSeparator;
@@ -88,12 +119,12 @@ begin
   AddEmpty;
 end;
 
-procedure TioDBBuilderSqlScript.AddWarning(const AText: String);
+procedure TioDBBuilderScriptSection.AddWarning(const AText: String);
 begin
   AddComment(Format('WARNING:  %s',  [AText]));
 end;
 
-procedure TioDBBuilderSqlScript.AddWarnings(const WarningsList: TStrings);
+procedure TioDBBuilderScriptSection.AddWarnings(const WarningsList: TStrings);
 var
   LWarning: String;
 begin
@@ -103,7 +134,12 @@ begin
     AddWarning(LWarning);
 end;
 
-constructor TioDBBuilderSqlScript.Create(const AIndentationWidth: integer; const ASeparatorLength: integer);
+procedure TioDBBuilderScriptSection.Clear;
+begin
+  FScript.Clear;
+end;
+
+constructor TioDBBuilderScriptSection.Create(const AIndentationWidth: integer; const ASeparatorLength: integer);
 begin
   inherited Create;
 
@@ -112,54 +148,110 @@ begin
   FScript := TStringList.Create;
 end;
 
-procedure TioDBBuilderSqlScript.DecIndentationLevel;
+procedure TioDBBuilderScriptSection.DecIndentationLevel;
 begin
   FIndentation.DecIndent;
 end;
 
-destructor TioDBBuilderSqlScript.Destroy;
+destructor TioDBBuilderScriptSection.Destroy;
 begin
   FScript.Free;
 
   inherited;
 end;
 
-function TioDBBuilderSqlScript.GetCurrentIndentation: TioIndentation;
+function TioDBBuilderScriptSection.GetCurrentIndentation: TioIndentation;
 begin
   Result := FIndentation;
 end;
 
-function TioDBBuilderSqlScript.GetIndentation: String;
+function TioDBBuilderScriptSection.GetIndentation: String;
 begin
   Result := FIndentation.IndentChars;
 end;
 
-function TioDBBuilderSqlScript.GetSQL: TStringList;
+function TioDBBuilderScriptSection.GetSQL: TStringList;
 begin
   Result := FScript;
 end;
 
-procedure TioDBBuilderSqlScript.IncIndentationLevel;
+procedure TioDBBuilderScriptSection.IncIndentationLevel;
 begin
   FIndentation.IncIndent;
 end;
 
+{ TioDBBuilderSqlScript }
+
+procedure TioDBBuilderSqlScript.Clear;
+begin
+  Header.Clear;
+  Schema.Clear;
+  Footer.Clear;
+end;
+
+constructor TioDBBuilderSqlScript.Create(const AIndentationWidth, ASeparatorLength: integer);
+begin
+  inherited Create;
+
+  FFullScript := TStringList.Create;
+  FScriptHeader := TioDBBuilderScriptSection.Create(AIndentationWidth, ASeparatorLength);
+  FSchemaScript := TioDBBuilderScriptSection.Create(AIndentationWidth, ASeparatorLength);
+  FScriptFooter := TioDBBuilderScriptSection.Create(AIndentationWidth, ASeparatorLength);
+end;
+
+destructor TioDBBuilderSqlScript.Destroy;
+begin
+  FFullScript.Free;
+
+  inherited;
+end;
+
+function TioDBBuilderSqlScript.GetFooter: IioDBBuilderSqlScriptSection;
+begin
+  Result := FScriptFooter;
+end;
+
+function TioDBBuilderSqlScript.GetHeader: IioDBBuilderSqlScriptSection;
+begin
+  Result := FScriptHeader;
+end;
+
+function TioDBBuilderSqlScript.GetSchema: IioDBBuilderSqlScriptSection;
+begin
+  Result := FSchemaScript;
+end;
+
+function TioDBBuilderSqlScript.GetSQL: TStringList;
+begin
+  FFullScript.Clear;
+  FFullScript.AddStrings(FScriptHeader.SQL);
+  FFullScript.AddStrings(FSchemaScript.SQL);
+  FFullScript.AddStrings(FScriptFooter.SQL);
+
+  Result := FFullScript;
+end;
+
+procedure TioDBBuilderSqlScript.SaveToFile(const AFileName: string);
+begin
+  SQL.SaveToFile(AFileName);
+end;
+
 procedure TioDBBuilderSqlScript.ScriptBegin(const AConnectionDefName, ADriverID: string);
 begin
-  AddSeparator;
-  AddComment('Start of the script generated by iORM');
-  AddSeparator;
-  AddComment('Date - time....: ' + FormatDateTime('d mmm yyyy - hh:nn:ss', Now));
-  AddComment('Connection name: ' + AConnectionDefName);
-  AddComment('DBMS...........: ' + ADriverID);
-  AddSeparator;
+  Header.AddSeparator;
+  Header.AddComment('Start of the script generated by iORM');
+  Header.AddSeparator;
+  Header.AddComment('Date - time....: ' + FormatDateTime('d mmm yyyy - hh:nn:ss', Now));
+  Header.AddComment('Connection name: ' + AConnectionDefName);
+  Header.AddComment('DBMS...........: ' + ADriverID);
+  Header.AddSeparator;
 end;
 
 procedure TioDBBuilderSqlScript.ScriptEnd;
 begin
-  AddSeparator;
-  AddComment('End of the script generated by iORM');
-  AddSeparator;
+  Footer.AddSeparator;
+  Footer.AddComment('End of the script generated by iORM');
+  Footer.AddSeparator;
 end;
 
 end.
