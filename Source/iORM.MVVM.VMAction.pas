@@ -753,6 +753,15 @@ end;
   // END: MVVM STANDARD ACTIONS TO SHOW AN OBJECT
   // =================================================================================================
 
+  procedure RegisterVMActions(const CategoryName: string; const AClasses: array of TioVMActionCustomClass;
+    Resource: TComponentClass);
+  procedure UnRegisterVMActions(const AClasses: array of TioVMActionCustomClass);
+//  procedure EnumRegisteredVMActions(Proc: TEnumActionProc; Info: TEnumActionProcInfo; FrameworkType: string = '');
+
+
+
+
+
 implementation
 
 uses
@@ -760,6 +769,20 @@ uses
   iORM.RttiContext.Factory, iORM.StdActions.CloseQueryActionRegister,
   iORM.Abstraction, iORM.ETM.Engine, iORM.StdActions.CommonBehaviour,
   iORM.MVVM.ViewModel;
+
+
+procedure RegisterVMActions(const CategoryName: string; const AClasses: array of TioVMActionCustomClass;
+  Resource: TComponentClass);
+begin
+
+end;
+
+procedure UnRegisterVMActions(const AClasses: array of TioVMActionCustomClass);
+begin
+
+end;
+
+
 
 { TioVMActionCustom }
 
