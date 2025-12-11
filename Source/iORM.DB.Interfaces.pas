@@ -247,7 +247,7 @@ type
   // Interfaccia per la classe che esegue script sul DB (usato dal DBBuilder)
   IioScript = interface
     ['{DF0FA3CE-233A-454E-A501-4FFDAE0CD713}']
-    procedure Execute;
+    function Execute: boolean;
   end;
 
   // Interfaccia per le classi che si occupano di convertire i dati in

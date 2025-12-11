@@ -50,7 +50,7 @@ type
   public
     constructor Create(const AConnection: IioConnection; const AScript: TStrings);
     destructor Destroy; override;
-    procedure Execute;
+    function Execute: boolean;
   end;
 
 implementation
@@ -81,7 +81,7 @@ begin
   inherited;
 end;
 
-procedure TioScript.Execute;
+function TioScript.Execute: boolean;
 begin
   FConnectionComponent.StartTransaction;
   try
