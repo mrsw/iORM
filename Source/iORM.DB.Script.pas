@@ -83,10 +83,13 @@ end;
 
 function TioScript.Execute: boolean;
 begin
+  Result := False;
+
   FConnectionComponent.StartTransaction;
   try
     FScriptComponent.ExecuteScript(FScript);
     FConnectionComponent.Commit;
+    Result := True;
   except
     FConnectionComponent.Rollback;
   end;
