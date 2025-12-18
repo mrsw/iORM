@@ -46,20 +46,27 @@ uses
   Data.DB, FireDAC.Stan.Intf, iORM.CommonTypes,
   System.JSON, iORM.Where.Interfaces,
   FireDAC.Comp.DataSet, iORM.LiveBindings.BSPersistence,
-  iORM.Where.SqlItems.Interfaces, iORM.Context.Map.Interfaces;
+  iORM.Where.SqlItems.Interfaces, iORM.Context.Map.Interfaces,
+  iORM.SynchroStrategy.Interfaces, iORM.SynchroStrategy.Custom;
 
 const
   OBJVERSION_NULL = 0;
   TRANSACTION_TIMESTAMP_NULL = 0;
 
-  KEY_WHERE = 'Where';
-  KEY_SQLDESTINATION = 'SQLDestination';
-  KEY_DATAOBJECT = 'DataObj';
+  KEY_BLINDLEVEL = 'BlindLevel';
+  KEY_EXCEPTIONCLASSNAME = 'ExceptionClassName';
+  KEY_EXCEPTIONMESSAGE = 'ExceptionMessage';
+  KEY_INTENTTYPE = 'IntentType';
   KEY_JSONDATAVALUE = 'JSONDataValue';
-  KEY_RELATIONPROPERTYNAME = 'RelPropName';
-  KEY_RELATIONOID = 'RelOID';
-  KEY_BLINDINSERT = 'Blind';
+  KEY_METHODNAME = 'MethodName';
+  KEY_RELATIONOID = 'RelationOID';
+  KEY_RELATIONPROPERTYNAME = 'RelationPropertyName';
+  KEY_SQLDESTINATION = 'SQLDestination';
   KEY_STREAM = 'Stream';
+  KEY_USERID = 'UserID';
+  KEY_USERNAME = 'UserName';
+  KEY_USERTOKEN = 'UserToken';
+  KEY_WHERE = 'Where';
 
 type
 
@@ -70,27 +77,39 @@ type
   TioParams = TFDParams;
 
   // Strategy class reference
-  TioStrategyRef = class of TioStrategyIntf;
+  TioPersistenceStrategyRef = class of TioPersistenceStrategyIntf;
 
   TioConnectionType = (ctFirebird, ctSQLite,
 {$IFNDEF ioDelphiProfessional}
     ctSQLServer,
 {$ENDIF}
-    ctMySQL, ctHTML);
+    ctMySQL, ctHTTP);
 
   TioKeyGenerationTime = (kgtUndefined, kgtAfterInsert, kgtBeforeInsert);
 
-  TioConnectionInfo = record
-    BaseURL: String;
-    ConnectionName: String;
-    ConnectionType: TioConnectionType;
-    KeyGenerationTime: TioKeyGenerationTime;
-    Password: String;
-    Persistent: Boolean;
-    Strategy: TioStrategyRef;
-    UserName: String;
+  TioConnectionInfo = class
+  strict private
+    FBaseURL: String;
+    FConnectionName: String;
+    FConnectionType: TioConnectionType;
+    FKeyGenerationTime: TioKeyGenerationTime;
+    FPassword: String;
+    FPersistent: Boolean;
+    FPersistenceStrategy: TioPersistenceStrategyRef;
+    FUserName: String;
+    FSynchroStrategy: IioSynchroStrategy_Client;
+  public
     constructor Create(const AConnectionName: String; const AConnectionType: TioConnectionType; const APersistent: Boolean;
-      const AKeyGenerationTime: TioKeyGenerationTime);
+      const AKeyGenerationTime: TioKeyGenerationTime; const ASynchroStrategy: IioSynchroStrategy_Client);
+    property BaseURL: String read FBaseURL write FBaseURL;
+    property ConnectionName: String read FConnectionName write FConnectionName;
+    property ConnectionType: TioConnectionType read FConnectionType write FConnectionType;
+    property KeyGenerationTime: TioKeyGenerationTime read FKeyGenerationTime write FKeyGenerationTime;
+    property Password: String read FPassword write FPassword;
+    property Persistent: Boolean read FPersistent write FPersistent;
+    property PersistenceStrategy: TioPersistenceStrategyRef read FPersistenceStrategy write FPersistenceStrategy;
+    property UserName: String read FUserName write FUserName;
+    property SynchroStrategy: IioSynchroStrategy_Client read FSynchroStrategy write FSynchroStrategy;
   end;
 
   TioCompareOperatorRef = class of TioCompareOperator;
@@ -103,7 +122,7 @@ type
   // -Interfaccia per oggetti contenenti i parametri di una connessione da inserire
   // nel connection manager
   // In pratica utilizzo l'interfaccia "IFDStanConnectionDef" fornita da FireDAC
-  IIoConnectionDef = IFDStanConnectionDef;
+  IIoStanConnectionDef = IFDStanConnectionDef;
 
   // Forward declaration
   IioQuery = interface;
@@ -153,11 +172,11 @@ type
     ['{E29F952A-E7E5-44C7-A3BE-09C4F2939060}']
     procedure Execute(const AResource: String);
     // ioRequestBody property
-    function GetRequestBody: IioHttpRequestBody;
-    property RequestBody: IioHttpRequestBody read GetRequestBody;
+    function GetioRequestBody: IioHttpRequestBody;
+    property ioRequestBody: IioHttpRequestBody read GetioRequestBody;
     // ioResponseBody property
-    function GetResponseBody: IioHttpResponseBody;
-    property ResponseBody: IioHttpResponseBody read GetResponseBody;
+    function GetioResponseBody: IioHttpResponseBody;
+    property ioResponseBody: IioHttpResponseBody read GetioResponseBody;
   end;
 
   // Interfaccia che contiene info sulla connessione e sull'utente correnti
@@ -196,12 +215,13 @@ type
     procedure ParamByName_SetValue(const AParamName: String; const AValue: Variant);
     procedure ParamByProp_Clear(const AProp: IioProperty; const ADataType: TFieldType);
     procedure ParamByProp_SetValue(const AProp: IioProperty; const AValue: Variant);
-    // procedure ParamByProp_SetValueAsString(const AProp: IioProperty; const AValue: String);
+    procedure ParamByProp_SetValueAsString(const AProp: IioProperty; const AValue: String);
     procedure ParamByProp_SetValueAsDateTime(const AProp: IioProperty; const AValue: TDateTime);
     procedure ParamByProp_SetValueAsDate(const AProp: IioProperty; const AValue: TDate);
     procedure ParamByProp_SetValueAsTime(const AProp: IioProperty; const AValue: TTime);
-    // procedure ParamByProp_SetValueAsFloat(const AProp: IioProperty; const AValue: Double);
+    procedure ParamByProp_SetValueAsFloat(const AProp: IioProperty; const AValue: Double);
     procedure ParamByProp_SetValueByContext(const AProp: IioProperty; const AContext: IioContext);
+    procedure ParamByProp_SetValueAsInteger(const AProp: IioProperty; const AValue: Integer);
     procedure ParamByProp_SetValueAsIntegerNullIfZero(const AProp: IioProperty; const AValue: Integer);
     procedure ParamByProp_LoadAsStreamObj(const AObj: TObject; const AProperty: IioProperty);
     procedure ParamObjVersion_SetValue(const AContext: IioContext);
@@ -211,12 +231,11 @@ type
     procedure ParamObjUpdated_SetValue(const AContext: IioContext);
     procedure ParamObjUpdatedUserID_SetValue(const AContext: IioContext);
     procedure ParamObjUpdatedUserName_SetValue(const AContext: IioContext);
-    // procedure WhereParamByProp_SetValue(const AProp: IioProperty; const AValue: Variant);
-    // procedure WhereParamByProp_SetValueAsDateTime(const AProp: IioProperty; const AValue: TDateTime);
-    // procedure WhereParamByProp_SetValueAsFloat(const AProp: IioProperty; const AValue: Double);
+    procedure WhereParamByProp_SetValue(const AProp: IioProperty; const AValue: Variant);
+    procedure WhereParamByProp_SetValueAsDateTime(const AProp: IioProperty; const AValue: TDateTime);
+    procedure WhereParamByProp_SetValueAsFloat(const AProp: IioProperty; const AValue: Double);
     procedure WhereParamObjID_SetValue(const AContext: IioContext);
     procedure WhereParamObjVersion_SetValue(const AContext: IioContext);
-
     // Connection property
     function GetConnection: IioConnectionDB;
     property Connection: IioConnectionDB read GetConnection;
@@ -228,7 +247,7 @@ type
   // Interfaccia per la classe che esegue script sul DB (usato dal DBBuilder)
   IioScript = interface
     ['{DF0FA3CE-233A-454E-A501-4FFDAE0CD713}']
-    procedure Execute;
+    function Execute: boolean;
   end;
 
   // Interfaccia per le classi che si occupano di convertire i dati in
@@ -262,11 +281,14 @@ type
     class procedure GenerateSqlDropIndex(const AQuery: IioQuery; const AContext: IioContext; AIndexName: String); virtual; abstract;
     class procedure GenerateSqlExists(const AQuery: IioQuery; const AContext: IioContext); virtual; abstract;
     class procedure GenerateSqlInsert(const AQuery: IioQuery; const AContext: IioContext); virtual;
-    class function GenerateSqlJoinSectionItem(const AJoinItem: IioJoinItem): String; virtual;
+    class procedure GenerateSqlMax(const AQuery: IioQuery; const AContext: IioContext; const AProperty: IioProperty); virtual;
+    class procedure GenerateSqlMin(const AQuery: IioQuery; const AContext: IioContext; const AProperty: IioProperty); virtual;
     class procedure GenerateSqlNextID(const AQuery: IioQuery; const AContext: IioContext); virtual; abstract;
     class procedure GenerateSqlSelect(const AQuery: IioQuery; const AContext: IioContext); virtual;
     class procedure GenerateSqlUpdate(const AQuery: IioQuery; const AContext: IioContext); virtual;
-    class function GenerateSqlSelectNestedWhere_OLD(const AMap: IioMap; const ANestedCriteria: IioSqlItemCriteria): String; virtual;
+    class procedure GenerateSqlSelectLastObjVersionFromEntity(const AQuery: IioQuery; const AContext: IioContext); virtual;
+    class procedure GenerateSqlSelectLastObjVersionFromETM(const AQuery: IioQuery; const AEtmContext: IioContext); virtual;
+    class function GenerateSqlJoinSectionItem(const AJoinItem: IioJoinItem): String; virtual;
   end;
 
   // Interfaccia per le classi che devono generare le LogicRelations
@@ -279,7 +301,6 @@ type
     class function _ClosePar: IioSqlItem; virtual;
   end;
 
-  { TODO : Si potrebbe lasciare solo il metodo NewCompareOperator ed eliminare tutto il resto (anche le LogicRelations) }
   // Interfaccia per le classi che devono generare operatori di comparazione
   TioCompareOperator = class abstract
     class function CompareOpToCompareOperator(const ACompareOp: TioCompareOp): IioSqlItem; virtual;
@@ -293,6 +314,7 @@ type
     class function _NotLike: IioSqlItem; virtual;
     class function _IsNull: IioSqlItem; virtual;
     class function _IsNotNull: IioSqlItem; virtual;
+    class function _In: IioSqlItem; virtual;
   end;
 
   // Interface for TransactionColection
@@ -326,44 +348,77 @@ type
   IioHttpRequestBody = interface
     ['{83DE9ECE-47EA-4814-B40E-3E39FAA210A2}']
     procedure Clear;
-    function ToJSONObject: TJSONObject;
-    // Where
-    procedure SetWhere(const Value: IioWhere);
-    function GetWhere: IioWhere;
-    property Where: IioWhere read GetWhere write SetWhere;
-    // SQLDestination
-    procedure SetSQLDestination(const Value: IioSQLDestination);
-    function GetSQLDestination: IioSQLDestination;
-    property SQLDestination: IioSQLDestination read GetSQLDestination write SetSQLDestination;
-    // DataObject
-    procedure SetDataObject(const Value: TObject);
-    function GetDataObject: TObject;
-    property DataObject: TObject read GetDataObject write SetDataObject;
-    // RelationPropertyName
-    procedure SetRelationPropertyName(const Value: String);
-    function GetRelationPropertyName: String;
-    property RelationPropertyName: String read GetRelationPropertyName write SetRelationPropertyName;
-    // RelationOID
-    procedure SetRelationOID(const Value: Integer);
-    function GetRelationOID: Integer;
-    property RelationOID: Integer read GetRelationOID write SetRelationOID;
-    // BlindInsert
-    procedure SetBlindInsert(const Value: Boolean);
-    function GetBlindInsert: Boolean;
-    property BlindInsert: Boolean read GetBlindInsert write SetBlindInsert;
-  end;
-
-  IioHttpResponseBody = interface
-    ['{E5A14525-308F-4877-99B7-C270D691FC6D}']
-    function ToJSONObject: TJSONObject;
+    function ToJsonText: String;
+    // BlindLevel
+    procedure SetBlindLevel(const Value: Byte);
+    function GetBlindLevel: Byte;
+    property BlindLevel: Byte read GetBlindLevel write SetBlindLevel;
+    // IntentType
+    procedure SetIntentType(const Value: TioPersistenceIntentType);
+    function GetIntentType: TioPersistenceIntentType;
+    property IntentType: TioPersistenceIntentType read GetIntentType write SetIntentType;
     // JSONDataValue
     procedure SetJSONDataValue(const Value: TJSONValue);
     function GetJSONDataValue: TJSONValue;
     property JSONDataValue: TJSONValue read GetJSONDataValue write SetJSONDataValue;
-    // DataObject
-    procedure SetDataObject(const Value: TObject);
-    function GetDataObject: TObject;
-    property DataObject: TObject read GetDataObject write SetDataObject;
+    // JSONDataValueAsObject
+    procedure SetJSONDataValueAsObject(const AObj: TObject);
+    function GetJSONDataValueAsObject: TObject;
+    property JSONDataValueAsObject: TObject read GetJSONDataValueAsObject write SetJSONDataValueAsObject;
+    // MethodName
+    procedure SetMethodName(const Value: String);
+    function GetMethodName: String;
+    property MethodName: String read GetMethodName write SetMethodName;
+    // RelationOID
+    procedure SetRelationOID(const Value: Integer);
+    function GetRelationOID: Integer;
+    property RelationOID: Integer read GetRelationOID write SetRelationOID;
+    // RelationPropertyName
+    procedure SetRelationPropertyName(const Value: String);
+    function GetRelationPropertyName: String;
+    property RelationPropertyName: String read GetRelationPropertyName write SetRelationPropertyName;
+    // SQLDestination
+    procedure SetSQLDestination(const Value: IioSQLDestination);
+    function GetSQLDestination: IioSQLDestination;
+    property SQLDestination: IioSQLDestination read GetSQLDestination write SetSQLDestination;
+    // UserID
+    procedure SetUserID(const Value: Integer);
+    function GetUserID: Integer;
+    property UserID: Integer read GetUserID write SetUserID;
+    // UserName
+    procedure SetUserName(const Value: String);
+    function GetUserName: String;
+    property UserName: String read GetUserName write SetUserName;
+    // UserToken
+    procedure SetUserToken(const Value: String);
+    function GetUserToken: String;
+    property UserToken: String read GetUserToken write SetUserToken;
+    // Where
+    procedure SetWhere(const Value: IioWhere);
+    function GetWhere: IioWhere;
+    property Where: IioWhere read GetWhere write SetWhere;
+  end;
+
+  IioHttpResponseBody = interface
+    ['{E5A14525-308F-4877-99B7-C270D691FC6D}']
+    function ExceptionOccurred: Boolean;
+    function ToJsonText: String;
+    // ExceptionClassName
+    procedure SetExceptionClassName(const Value: String);
+    function GetExceptionClassName: String;
+    property ExceptionClassName: String read GetExceptionClassName write SetExceptionClassName;
+    // ExceptionMessage
+    procedure SetExceptionMessage(const Value: String);
+    function GetExceptionMessage: String;
+    property ExceptionMessage: String read GetExceptionMessage write SetExceptionMessage;
+    // JSONDataValue
+    procedure SetJSONDataValue(const Value: TJSONValue);
+    function GetJSONDataValue: TJSONValue;
+    property JSONDataValue: TJSONValue read GetJSONDataValue write SetJSONDataValue;
+    // JSONDataValueAsObject
+    procedure SetJSONDataValueAsObject(const AObj: TObject);
+    function GetJSONDataValueAsObject: TObject;
+    property JSONDataValueAsObject: TObject read GetJSONDataValueAsObject write SetJSONDataValueAsObject;
     // Stream
     function GetStream: TStream;
     property Stream: TStream read GetStream;
@@ -371,49 +426,61 @@ type
 
   // Base class for strategy (Static class as an interface)
   // Note: {$DEFINE ioStrategyInterceptorsOff} to disable strategy interceptors
-  TioStrategyIntf = class abstract
+  TioPersistenceStrategyIntf = class abstract
   protected
-    // ---------- Begin intercepted methods (StrategyInterceptors) ----------
-    class procedure _DoPersistObject(const AObj: TObject; const ARelationPropertyName: String; const ARelationOID: Integer; const ABlindInsert: Boolean;
-      const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String); virtual; abstract;
-    class procedure _DoPersistList(const AList: TObject; const ARelationPropertyName: String; const ARelationOID: Integer; const ABlindInsert: Boolean;
-      const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String); virtual; abstract;
-    class procedure _DoDeleteObject(const AObj: TObject); virtual; abstract;
-    class procedure _DoDeleteList(const AList: TObject); virtual; abstract;
-    class procedure _DoLoadList(const AWhere: IioWhere; const AList: TObject); virtual; abstract;
-    class function _DoLoadObject(const AWhere: IioWhere; const AObj: TObject): TObject; virtual; abstract;
-    // ---------- End intercepted methods (StrategyInterceptors) ----------
+    // ========== BEGIN OF METHODS TO BE OVERRIDED FROM CONCRETE PERSISTENCE STRATEGIES ==========
+    // ---------- Begin intercepted methods (CRUDInterceptors) ----------
+    class procedure _DoPersistObject(const AObj: TObject; const AIntent: TioPersistenceIntentType; const ARelationPropertyName: String;
+      const ARelationOID: Integer; const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String;
+      const ABlindLevel: Byte); virtual; abstract;
+    class procedure _DoPersistList(const AList: TObject; const AIntent: TioPersistenceIntentType; const ARelationPropertyName: String;
+      const ARelationOID: Integer; const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String;
+      const ABlindLevel: Byte); virtual; abstract;
+    class procedure _DoDeleteObject(const AObj: TObject; const AIntent: TioPersistenceIntentType; const ABlindLevel: Byte); virtual; abstract;
+    class procedure _DoDeleteList(const AList: TObject; const AIntent: TioPersistenceIntentType; const ABlindLevel: Byte); virtual; abstract;
+    class procedure _DoLoadList(const AWhere: IioWhere; const AList: TObject; const AIntent: TioPersistenceIntentType); virtual; abstract;
+    class function _DoLoadObject(const AWhere: IioWhere; const AObj: TObject; const AIntent: TioPersistenceIntentType): TObject; virtual; abstract;
+    // ---------- End intercepted methods (CRUDInterceptors) ----------
   public
     class procedure StartTransaction(const AConnectionName: String); virtual; abstract;
     class procedure CommitTransaction(const AConnectionName: String); virtual; abstract;
     class procedure RollbackTransaction(const AConnectionName: String); virtual; abstract;
     class function InTransaction(const AConnectionName: String): Boolean; virtual; abstract;
-    class procedure Delete(const AWhere: IioWhere); virtual; abstract;
-    class function LoadObjectByClassOnly(const AWhere: IioWhere; const AObj: TObject): TObject; virtual; abstract;
-    class procedure LoadDataSet(const AWhere: IioWhere; const ADestDataSet: TFDDataSet); virtual; abstract;
-    class function Count(const AWhere: IioWhere): Integer; virtual; abstract;
+    class procedure Delete(const AWhere: IioWhere); virtual;
+    class procedure LoadDataSet(const AWhere: IioWhere; const ADestDataSet: TFDDataSet); virtual;
+    class function LoadObjectByClassOnly(const AWhere: IioWhere; const AObj: TObject; const AIntent: TioPersistenceIntentType): TObject; virtual;
+    class function LoadObjVersion(const AContext: IioContext): Integer; virtual; abstract;
+    class function Count(const AWhere: IioWhere): Integer; virtual;
+    class function Max(const AWhere: IioWhere; const APropertyName: String): Integer; virtual;
+    class function Min(const AWhere: IioWhere; const APropertyName: String): Integer; virtual;
+    // SynchroStrategy
+    class procedure DoSynchronization(const APayload: TioCustomSynchroStrategy_Payload); virtual; abstract;
     // SQLDestinations
     class procedure SQLDest_LoadDataSet(const ASQLDestination: IioSQLDestination; const ADestDataSet: TFDDataSet); virtual; abstract;
     class procedure SQLDest_Execute(const ASQLDestination: IioSQLDestination); virtual; abstract;
+    // ========== END OF METHODS TO BE OVERRIDED FROM CONCRETE PERSISTENCE STRATEGIES ==========
+
     // ---------- Begin intercepted methods (StrategyInterceptors) ----------
-    class procedure PersistObject(const AObj: TObject; const ARelationPropertyName: String; const ARelationOID: Integer; const ABlindInsert: Boolean;
-      const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String);
-    class procedure PersistList(const AList: TObject; const ARelationPropertyName: String; const ARelationOID: Integer; const ABlindInsert: Boolean;
-      const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String);
-    class procedure DeleteObject(const AObj: TObject);
-    class procedure DeleteList(const AList: TObject);
-    class procedure LoadList(const AWhere: IioWhere; const AList: TObject);
-    class function LoadObject(const AWhere: IioWhere; const AObj: TObject): TObject;
+    class procedure PersistObject(const AObj: TObject; const AIntent: TioPersistenceIntentType; const ARelationPropertyName: String;
+      const ARelationOID: Integer; const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String;
+      const ABlindLevel: Byte);
+    class procedure PersistList(const AList: TObject; const AIntent: TioPersistenceIntentType; const ARelationPropertyName: String; const ARelationOID: Integer;
+      const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String; const ABlindLevel: Byte);
+    class procedure DeleteObject(const AObj: TObject; const AIntent: TioPersistenceIntentType; const ABlindLevel: Byte);
+    class procedure DeleteList(const AList: TObject; const AIntent: TioPersistenceIntentType; const ABlindLevel: Byte);
+    class procedure LoadList(const AWhere: IioWhere; const AList: TObject; const AIntent: TioPersistenceIntentType);
+    class function LoadObject(const AWhere: IioWhere; const AObj: TObject; const AIntent: TioPersistenceIntentType): TObject;
     // ---------- End intercepted methods (StrategyInterceptors) ----------
   end;
 
 implementation
 
 uses
-  iORM.SqlTranslator, iORM.Strategy.Factory, System.SysUtils, iORM.Attributes,
+  iORM.SqlTranslator, iORM.PersistenceStrategy.Factory, System.SysUtils, iORM.Attributes,
   iORM.Exceptions, iORM.Utilities, iORM.SqlItems,
   System.StrUtils, iORM.Context.Container, iORM.Resolver.Interfaces,
-  iORM.Resolver.Factory, iORM.Interceptor.Strategy.Register;
+  iORM.Resolver.Factory, iORM.Interceptor.Strategy.Register,
+  iORM.Context.Factory;
 
 { TioSqlGenerator }
 
@@ -478,7 +545,12 @@ begin
     // AQuery.SQL.Add(AContext.Where.GetSql(AContext.Map))
     AQuery.SQL.Add(AContext.Where.GetSqlWithTrueClass(AContext.Map, AContext.IsTrueClass, AContext.GetTrueClass))
   else
+  begin
     AQuery.SQL.Add('WHERE ' + AContext.GetProperties.GetIdProperty.GetSqlFieldName + '=:' + AContext.GetProperties.GetIdProperty.GetSqlWhereParamName);
+    if AContext.BlindLevel_Do_DetectConflicts and AContext.GetProperties.ObjVersionPropertyExist then
+      AQuery.SQL.Add('AND ' + AContext.GetProperties.ObjVersionProperty.GetSqlFieldName + ' = :' +
+        AContext.GetProperties.ObjVersionProperty.GetSqlWhereParamName);
+  end;
   // -----------------------------------------------------------------
 end;
 
@@ -538,11 +610,13 @@ begin
     end;
   // Add the ioTrueClass if enabled
   if AContext.IsTrueClass then
-    AQuery.SQL.Add(',' + AContext.GetTrueClass.GetSqlFieldName + '=:' + AContext.GetTrueClass.GetSqlParamName);
-  // Where conditions (with ObjVersion if exists for this entity type)
-  AQuery.SQL.Add('WHERE ' + AContext.GetProperties.GetIdProperty.GetSqlFieldName + '=:' + AContext.GetProperties.GetIdProperty.GetSqlWhereParamName);
-  if AContext.GetProperties.ObjVersionPropertyExist then
-    AQuery.SQL.Add('AND ' + AContext.GetProperties.ObjVersionProperty.GetSqlFieldName + '=:' + AContext.GetProperties.ObjVersionProperty.GetSqlWhereParamName);
+    AQuery.SQL.Add(',' + AContext.GetTrueClass.GetSqlFieldName + ' = :' + AContext.GetTrueClass.GetSqlParamName);
+  // Where conditions
+  // note:
+  AQuery.SQL.Add('WHERE ' + AContext.GetProperties.GetIdProperty.GetSqlFieldName + ' = :' + AContext.GetProperties.GetIdProperty.GetSqlWhereParamName);
+  if AContext.BlindLevel_Do_DetectConflicts and AContext.GetProperties.ObjVersionPropertyExist then
+    AQuery.SQL.Add('AND ' + AContext.GetProperties.ObjVersionProperty.GetSqlFieldName + ' = :' +
+      AContext.GetProperties.ObjVersionProperty.GetSqlWhereParamName);
   // -----------------------------------------------------------------
 end;
 
@@ -561,13 +635,53 @@ begin
     jtFullOuter:
       Result := 'FULL OUTER JOIN ';
   else
-    raise EioException.Create(Self.ClassName + ': Join type not valid.');
+    raise EioGenericException.Create(Self.ClassName + ': Join type not valid.');
   end;
   // Joined table name
   Result := Result + '[' + AJoinItem.GetJoinClassRef.ClassName + ']';
   // Conditions
   if AJoinItem.GetJoinType <> jtCross then
     Result := Result + ' ON (' + AJoinItem.GetJoinCondition + ')';
+end;
+
+class procedure TioSqlGenerator.GenerateSqlMax(const AQuery: IioQuery; const AContext: IioContext; const AProperty: IioProperty);
+begin
+  // Build the query that returns the highest value for the property
+  // -----------------------------------------------------------------
+  // Select
+  AQuery.SQL.Add(Format('SELECT COALESCE(MAX(%s),0) FROM %s', [AProperty.GetSqlFieldName, AContext.GetTable.GetSQL]));
+  // -----------------------------------------------------------------
+end;
+
+class procedure TioSqlGenerator.GenerateSqlMin(const AQuery: IioQuery; const AContext: IioContext; const AProperty: IioProperty);
+begin
+  // Build the query that returns the lowest value for the property
+  // -----------------------------------------------------------------
+  // Select
+  AQuery.SQL.Add(Format('SELECT COALESCE(MIN(%s),0) FROM %s', [AProperty.GetSqlFieldName, AContext.GetTable.GetSQL]));
+  // -----------------------------------------------------------------
+end;
+
+class procedure TioSqlGenerator.GenerateSqlSelectLastObjVersionFromEntity(const AQuery: IioQuery; const AContext: IioContext);
+begin
+  // Build the query text
+  // -----------------------------------------------------------------
+  // Select
+  AQuery.SQL.Add(Format('SELECT %s FROM %s WHERE %s = :%s', [AContext.GetProperties.ObjVersionProperty.GetSqlFieldName, AContext.GetTable.GetSQL,
+    AContext.GetProperties.GetIdProperty.GetSqlFieldName, AContext.GetProperties.GetIdProperty.GetSqlWhereParamName]));
+  // -----------------------------------------------------------------
+end;
+
+class procedure TioSqlGenerator.GenerateSqlSelectLastObjVersionFromETM(const AQuery: IioQuery; const AEtmContext: IioContext);
+begin
+  // Build the query text
+  // -----------------------------------------------------------------
+  // Select
+  AQuery.SQL.Add(Format('SELECT MAX(%s) FROM %s WHERE %s = :%s AND %s = :%s', [AEtmContext.GetProperties.GetPropertyByName('EntityToVersion').GetSqlFieldName,
+    AEtmContext.GetTable.GetSQL, AEtmContext.GetProperties.GetPropertyByName('EntityClassName').GetSqlFieldName,
+    AEtmContext.GetProperties.GetPropertyByName('EntityClassName').GetSqlWhereParamName, AEtmContext.GetProperties.GetPropertyByName('EntityID')
+    .GetSqlFieldName, AEtmContext.GetProperties.GetPropertyByName('EntityID').GetSqlWhereParamName]));
+  // -----------------------------------------------------------------
 end;
 
 class procedure TioSqlGenerator.GenerateSqlSelect(const AQuery: IioQuery; const AContext: IioContext);
@@ -609,119 +723,6 @@ begin
   AQuery.SQL.Add(AContext.GetOrderBySql);
 end;
 
-class function TioSqlGenerator.GenerateSqlSelectNestedWhere_OLD(const AMap: IioMap; const ANestedCriteria: IioSqlItemCriteria): String;
-var
-  LDotPos: Integer;
-  FQualifiedStartingPropertyName: String;
-  procedure _RecursiveGenerateNestedWhere(const NMasterMap: IioMap; const NNestedPropName: String; const NPreviousBuildingResult: String;
-    var NFinalResult: String; const NIsFirstLoop: Boolean);
-  var
-    LFirstDotPos, LSecondDotPos: Integer;
-    LMasterPropName, LDetailPropName, LRemainingPropName, LTempPropName: String;
-    LDetailMap: IioMap;
-    LMasterProp, LDetailProp, LRelationChildProp: IioProperty;
-    LResolvedTypeList: IioResolvedTypeList;
-    LResolvedTypeName: String;
-    LCurrentBuildingResult: String;
-    LIsFinalLoop: Boolean;
-  begin
-    // Extract the position of the first and second dots in the ANestedPropName string parameter
-    // and set the RemainingPropName for the next recursion if needed,
-    // if the second dot does not exists then set its position to the length of the whole string and stop the recursion
-    LFirstDotPos := Pos('.', NNestedPropName);
-    LSecondDotPos := PosEx('.', NNestedPropName, LFirstDotPos + 1);
-    LRemainingPropName := String.Empty;
-    if LSecondDotPos > 0 then
-      LRemainingPropName := Copy(NNestedPropName, LFirstDotPos + 1, Length(NNestedPropName))
-    else
-      LSecondDotPos := NNestedPropName.Length + 1;
-    // Get the master and detail prop name
-    LMasterPropName := Copy(NNestedPropName, 1, LFirstDotPos - 1);
-    LDetailPropName := Copy(NNestedPropName, LFirstDotPos + 1, LSecondDotPos - LFirstDotPos - 1);
-    // Get the master property
-    LMasterProp := NMasterMap.GetProperties.GetPropertyByName(LMasterPropName);
-    // Resolve the type and alias then loop for all classes in the resolved type list
-    LResolvedTypeList := TioResolverFactory.GetResolver(rsByDependencyInjection).Resolve(LMasterProp.GetRelationChildTypeName,
-      LMasterProp.GetRelationChildTypeAlias, rmAllDistinctByConnectionAndTable);
-    for LResolvedTypeName in LResolvedTypeList do
-    begin
-      // Get the detail Map but if the current resolved class is not a persisted entity then skip it
-      LDetailMap := TioMapContainer.GetMap(LResolvedTypeName);
-      if LDetailMap.GetTable.IsNotPersistedEntity then
-        Continue;
-      // Get the detail Property but if not exists in the current resolved class then skip it
-      if not LDetailMap.GetProperties.PropertyExists(LDetailPropName) then
-        Continue;
-      LDetailProp := LDetailMap.GetProperties.GetPropertyByName(LDetailPropName);
-      // If the current resolved type is not for the same connection the skip it
-      if not LDetailMap.GetTable.IsForThisConnection(NMasterMap.GetTable.GetConnectionDefName) then
-        Continue;
-      // If the LRemainingPropName is empty then we are in the final loop (recursion is ending)
-      LIsFinalLoop := LRemainingPropName.IsEmpty;
-      // Get the relation type
-      // NB: If the relation type of the DetailProp is rtHasMany/rtHasOne then use it else use those of the MasterProp
-      // if (LDetailProp.GetRelationType = rtHasMany) or (LDetailProp.GetRelationType = rtHasOne) then
-      // LRelationType := LDetailProp.GetRelationType
-      // else
-      // LRelationType := LMasterProp.GetRelationType;
-      // Depending on relation type...
-      case LMasterProp.GetRelationType of
-        // BelongsTo relation type...
-        rtBelongsTo:
-          if LIsFinalLoop then
-            NFinalResult := Format('%s%s(SELECT %s FROM %s WHERE %s = %s)%s%s', [NFinalResult, IfThen(NFinalResult.IsEmpty, '', ' OR '),
-              LDetailProp.GetSqlQualifiedFieldName, LDetailMap.GetTable.GetSQL, LDetailMap.GetProperties.GetIdProperty.GetSqlQualifiedFieldName,
-              NPreviousBuildingResult, ANestedCriteria.CompareOpSqlItem.GetSQL, ANestedCriteria.ValueSqlItem.GetSQL(LDetailMap)])
-          else
-          begin
-            if (LDetailProp.GetRelationType = rtHasMany) or (LDetailProp.GetRelationType = rtHasOne) then
-              LTempPropName := LDetailMap.GetProperties.GetIdProperty.GetSqlQualifiedFieldName
-            else
-              LTempPropName := LDetailProp.GetSqlQualifiedFieldName;
-            LCurrentBuildingResult := Format('(SELECT %s FROM %s WHERE %s = %s)', [LTempPropName, LDetailMap.GetTable.GetSQL,
-              LDetailMap.GetProperties.GetIdProperty.GetSqlQualifiedFieldName, NPreviousBuildingResult]);
-            _RecursiveGenerateNestedWhere(LDetailMap, LRemainingPropName, LCurrentBuildingResult, NFinalResult, False); // Recursion
-          end;
-        // HasOne or HasMany relation type
-        rtHasMany, rtHasOne:
-          begin
-            LRelationChildProp := LDetailMap.GetProperties.GetPropertyByName(LMasterProp.GetRelationChildPropertyName);
-            if LIsFinalLoop then
-              NFinalResult := Format('%s%sEXISTS (SELECT 1 FROM %s WHERE %s = %s AND %s %s %s)', [NFinalResult, IfThen(NFinalResult.IsEmpty, '', ' OR '),
-                LDetailMap.GetTable.GetSQL, LRelationChildProp.GetSqlQualifiedFieldName,
-                IfThen(NIsFirstLoop, NMasterMap.GetProperties.GetIdProperty.GetSqlQualifiedFieldName, NPreviousBuildingResult),
-                LDetailProp.GetSqlQualifiedFieldName, ANestedCriteria.CompareOpSqlItem.GetSQL, ANestedCriteria.ValueSqlItem.GetSQL(LDetailMap)])
-            else
-            begin
-              LCurrentBuildingResult := Format('(SELECT %s FROM %s WHERE %s = %s)', [LDetailMap.GetProperties.GetIdProperty.GetSqlQualifiedFieldName,
-                LDetailMap.GetTable.GetSQL, LRelationChildProp.GetSqlQualifiedFieldName, NMasterMap.GetProperties.GetIdProperty.GetSqlQualifiedFieldName]);
-              _RecursiveGenerateNestedWhere(LDetailMap, LRemainingPropName, LCurrentBuildingResult, NFinalResult, False); // Recursion
-            end;
-          end;
-      else
-        raise EioException.Create(ClassName, 'GenerateSqlSelectNestedWhere', Format('Wrong relation type (%s) on property "%s" of class "%s"',
-          [TioUtilities.EnumToString<TioRelationType>(LMasterProp.GetRelationType), LMasterProp.GetName, NMasterMap.GetClassName]));
-      end;
-    end;
-  end;
-
-begin
-  Result := String.Empty;
-  LDotPos := Pos('.', ANestedCriteria.PropertyName);
-  if LDotPos > 0 then
-  begin
-    // Ricorda che il parametro "NPreviousBuildingResult" deve essere valorizzato con il GetSqlQualifiedFieldName della proprietà di inizio (es: ORDER.CUSTOMER)
-    // Extract the qualified name of the first property in the nested property name
-    FQualifiedStartingPropertyName := Copy(ANestedCriteria.PropertyName, 1, LDotPos - 1);
-    FQualifiedStartingPropertyName := AMap.GetProperties.GetPropertyByName(FQualifiedStartingPropertyName).GetSqlQualifiedFieldName;
-    // Recursion entry point and final build of the result
-    _RecursiveGenerateNestedWhere(AMap, ANestedCriteria.PropertyName, FQualifiedStartingPropertyName, Result, True);
-    Result := Format('(%s)', [Result]);
-  end
-  else
-    raise EioException.Create(ClassName, 'GenerateSqlSelectNestedWhere', 'Dot char not found on nested property name.');
-end;
-
 class procedure TioSqlGenerator.LoadSqlParamsFromContext(const AQuery: IioQuery; const AContext: IioContext);
 var
   Prop: IioProperty;
@@ -730,18 +731,6 @@ begin
   for Prop in AContext.GetProperties do
     if Prop.IsBlob then
       AQuery.ParamByProp_LoadAsStreamObj(Prop.GetValue(AContext.DataObject).AsObject, Prop);
-end;
-
-{ TioConnectionInfo }
-
-constructor TioConnectionInfo.Create(const AConnectionName: String; const AConnectionType: TioConnectionType; const APersistent: Boolean;
-  const AKeyGenerationTime: TioKeyGenerationTime);
-begin
-  ConnectionName := AConnectionName;
-  ConnectionType := AConnectionType;
-  KeyGenerationTime := AKeyGenerationTime;
-  Persistent := APersistent;
-  Strategy := TioStrategyFactory.ConnectionTypeToStrategy(AConnectionType);
 end;
 
 { TioCompareOperator }
@@ -770,8 +759,8 @@ begin
     coIsNotNull:
       Result := _IsNotNull;
   else
-    raise EioException.Create(Self.ClassName, 'CompareOpToCompareOperator', Format('Invalid CompareOp value "%s"',
-      [TioUtilities.EnumToString<TioCompareOp>(ACompareOp)]));
+    raise EioGenericException.Create(Self.ClassName, 'CompareOpToCompareOperator',
+      Format('Invalid CompareOp value "%s"', [TioUtilities.EnumToString<TioCompareOp>(ACompareOp)]));
   end;
 end;
 
@@ -788,6 +777,11 @@ end;
 class function TioCompareOperator._GreaterOrEqual: IioSqlItem;
 begin
   Result := TioSqlItem.Create(' >= ');
+end;
+
+class function TioCompareOperator._In: IioSqlItem;
+begin
+  Result := TioSqlItem.Create(' IN ');
 end;
 
 class function TioCompareOperator._IsNotNull: IioSqlItem;
@@ -841,8 +835,8 @@ begin
     loClosePar:
       Result := _ClosePar;
   else
-    raise EioException.Create(Self.ClassName, 'LogicOpToLogicRelation', Format('Invalid LogicOp value "%s"',
-      [TioUtilities.EnumToString<TioLogicOp>(ALogicOp)]));
+    raise EioGenericException.Create(Self.ClassName, 'LogicOpToLogicRelation',
+      Format('Invalid LogicOp value "%s"', [TioUtilities.EnumToString<TioLogicOp>(ALogicOp)]));
   end;
 end;
 
@@ -873,115 +867,201 @@ end;
 
 { TioStrategyIntf }
 
-class procedure TioStrategyIntf.DeleteList(const AList: TObject);
+class function TioPersistenceStrategyIntf.Count(const AWhere: IioWhere): Integer;
+begin
+  Result := 0;
+  AWhere.FillETM_Sql; // Per risolvere problema con HttpCOnnection (vedi dichiaraione classe TioWHERE, campi ETMFor...)
+end;
+
+class procedure TioPersistenceStrategyIntf.Delete(const AWhere: IioWhere);
+begin
+  AWhere.FillETM_Sql; // Per risolvere problema con HttpCOnnection (vedi dichiaraione classe TioWHERE, campi ETMFor...)
+end;
+
+class procedure TioPersistenceStrategyIntf.LoadDataSet(const AWhere: IioWhere; const ADestDataSet: TFDDataSet);
+begin
+  AWhere.FillETM_Sql; // Per risolvere problema con HttpCOnnection (vedi dichiaraione classe TioWHERE, campi ETMFor...)
+end;
+
+class function TioPersistenceStrategyIntf.LoadObjectByClassOnly(const AWhere: IioWhere; const AObj: TObject; const AIntent: TioPersistenceIntentType): TObject;
+begin
+  Result := nil;
+  AWhere.FillETM_Sql; // Per risolvere problema con HttpCOnnection (vedi dichiaraione classe TioWHERE, campi ETMFor...)
+end;
+
+class function TioPersistenceStrategyIntf.Max(const AWhere: IioWhere; const APropertyName: String): Integer;
+begin
+  Result := 0;
+  AWhere.FillETM_Sql; // Per risolvere problema con HttpCOnnection (vedi dichiaraione classe TioWHERE, campi ETMFor...)
+end;
+
+class function TioPersistenceStrategyIntf.Min(const AWhere: IioWhere; const APropertyName: String): Integer;
+begin
+  Result := 0;
+  AWhere.FillETM_Sql; // Per risolvere problema con HttpCOnnection (vedi dichiaraione classe TioWHERE, campi ETMFor...)
+end;
+
+class procedure TioPersistenceStrategyIntf.DeleteList(const AList: TObject; const AIntent: TioPersistenceIntentType; const ABlindLevel: Byte);
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
 var
   LDone: Boolean;
 {$ENDIF}
+{$ENDREGION}
 begin
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
   LDone := False;
   TioStrategyInterceptorRegister.BeforeDeleteList(AList, LDone);
   if LDone then
     Exit;
 {$ENDIF}
-  _DoDeleteList(AList);
+{$ENDREGION}
+  _DoDeleteList(AList, AIntent, ABlindLevel);
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
   TioStrategyInterceptorRegister.AfterDeleteList(AList);
 {$ENDIF}
+{$ENDREGION}
 end;
 
-class procedure TioStrategyIntf.DeleteObject(const AObj: TObject);
+class procedure TioPersistenceStrategyIntf.DeleteObject(const AObj: TObject; const AIntent: TioPersistenceIntentType; const ABlindLevel: Byte);
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
 var
   LDone: Boolean;
 {$ENDIF}
+{$ENDREGION}
 begin
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
   LDone := False;
   TioStrategyInterceptorRegister.BeforeDeleteObject(AObj, LDone);
   if LDone then
     Exit;
 {$ENDIF}
-  _DoDeleteObject(AObj);
+{$ENDREGION}
+  _DoDeleteObject(AObj, AIntent, ABlindLevel);
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
   TioStrategyInterceptorRegister.AfterDeleteObject(AObj);
 {$ENDIF}
+{$ENDREGION}
 end;
 
-class procedure TioStrategyIntf.LoadList(const AWhere: IioWhere; const AList: TObject);
+class procedure TioPersistenceStrategyIntf.LoadList(const AWhere: IioWhere; const AList: TObject; const AIntent: TioPersistenceIntentType);
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
 var
   LDone: Boolean;
 {$ENDIF}
+{$ENDREGION}
 begin
+  AWhere.FillETM_Sql; // Per risolvere problema con HttpCOnnection (vedi dichiaraione classe TioWHERE, campi ETMFor...)
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
   LDone := False;
   TioStrategyInterceptorRegister.BeforeLoadList(AWhere, AList, LDone);
   if LDone then
     Exit;
 {$ENDIF}
-  _DoLoadList(AWhere, AList);
+{$ENDREGION}
+  _DoLoadList(AWhere, AList, AIntent);
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
   TioStrategyInterceptorRegister.AfterLoadList(AWhere, AList);
 {$ENDIF}
+{$ENDREGION}
 end;
 
-class function TioStrategyIntf.LoadObject(const AWhere: IioWhere; const AObj: TObject): TObject;
+class function TioPersistenceStrategyIntf.LoadObject(const AWhere: IioWhere; const AObj: TObject; const AIntent: TioPersistenceIntentType): TObject;
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
 var
   LDone: Boolean;
 {$ENDIF}
+{$ENDREGION}
 begin
+  AWhere.FillETM_Sql; // Per risolvere problema con HttpCOnnection (vedi dichiaraione classe TioWHERE, campi ETMFor...)
   Result := AObj;
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
   LDone := False;
   Result := TioStrategyInterceptorRegister.BeforeLoadObject(AWhere, Result, LDone);
   if LDone then
     Exit;
 {$ENDIF}
-  Result := _DoLoadObject(AWhere, Result);
+{$ENDREGION}
+  Result := _DoLoadObject(AWhere, Result, AIntent);
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
   Result := TioStrategyInterceptorRegister.AfterLoadObject(AWhere, Result);
 {$ENDIF}
+{$ENDREGION}
 end;
 
-class procedure TioStrategyIntf.PersistList(const AList: TObject; const ARelationPropertyName: String; const ARelationOID: Integer; const ABlindInsert: Boolean;
-  const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String);
+class procedure TioPersistenceStrategyIntf.PersistList(const AList: TObject; const AIntent: TioPersistenceIntentType; const ARelationPropertyName: String; const ARelationOID: Integer;
+      const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String; const ABlindLevel: Byte);
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
 var
   LDone: Boolean;
 {$ENDIF}
+{$ENDREGION}
 begin
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
   LDone := False;
   TioStrategyInterceptorRegister.BeforePersistList(AList, LDone);
   if LDone then
     Exit;
 {$ENDIF}
-  _DoPersistList(AList, ARelationPropertyName, ARelationOID, ABlindInsert, AMasterBSPersistence, AMasterPropertyName, AMasterPropertyPath);
+{$ENDREGION}
+  _DoPersistList(AList, AIntent, ARelationPropertyName, ARelationOID, AMasterBSPersistence, AMasterPropertyName, AMasterPropertyPath, ABlindLevel);
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
   TioStrategyInterceptorRegister.AfterPersistList(AList);
 {$ENDIF}
+{$ENDREGION}
 end;
 
-class procedure TioStrategyIntf.PersistObject(const AObj: TObject; const ARelationPropertyName: String; const ARelationOID: Integer;
-  const ABlindInsert: Boolean; const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String);
+class procedure TioPersistenceStrategyIntf.PersistObject(const AObj: TObject; const AIntent: TioPersistenceIntentType; const ARelationPropertyName: String;
+      const ARelationOID: Integer; const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String;
+      const ABlindLevel: Byte);
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
 var
   LDone: Boolean;
 {$ENDIF}
+{$ENDREGION}
 begin
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
   LDone := False;
   TioStrategyInterceptorRegister.BeforePersistObject(AObj, LDone);
   if LDone then
     Exit;
 {$ENDIF}
-  _DoPersistObject(AObj, ARelationPropertyName, ARelationOID, ABlindInsert, AMasterBSPersistence, AMasterPropertyName, AMasterPropertyPath);
+{$ENDREGION}
+  _DoPersistObject(AObj, AIntent, ARelationPropertyName, ARelationOID, AMasterBSPersistence, AMasterPropertyName, AMasterPropertyPath, ABlindLevel);
+{$REGION '-----INTERCEPTORS-----'}
 {$IFNDEF ioStrategyInterceptorsOff}
   TioStrategyInterceptorRegister.AfterPersistObject(AObj);
 {$ENDIF}
+{$ENDREGION}
+end;
+
+{ TioConnectionInfo }
+
+constructor TioConnectionInfo.Create(const AConnectionName: String; const AConnectionType: TioConnectionType; const APersistent: Boolean;
+  const AKeyGenerationTime: TioKeyGenerationTime; const ASynchroStrategy: IioSynchroStrategy_Client);
+begin
+  FConnectionName := AConnectionName;
+  FConnectionType := AConnectionType;
+  FKeyGenerationTime := AKeyGenerationTime;
+  FPersistent := APersistent;
+  FSynchroStrategy := ASynchroStrategy;
+  FPersistenceStrategy := TioPersistenceStrategyFactory.ConnectionTypeToStrategy(AConnectionType);
 end;
 
 end.

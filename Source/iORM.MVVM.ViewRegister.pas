@@ -106,7 +106,7 @@ begin
   // if not Assigned(AViewContext) then
   // raise EioException.Create('TioViewContextRegister', 'Add', 'The ViewContext must be assigned.');
   if not Assigned(AView) then
-    raise EioException.Create('TioViewContextRegister', 'Add', 'The View must be assigned.');
+    raise EioGenericException.Create('TioViewContextRegister', 'Add', 'The View must be assigned.');
   // Avoid duplicated Views or ViewContexts
   // NB: Il codice commentato qui sotto è stato sistutuito con l'if sottostante per risolvere
   // l'errore che si creva nel caso in cui una View (e relativo ViewModel) fosse registrata (nel D.I.C.) come
@@ -192,14 +192,14 @@ function TioViewRegisterBase.GetItemByView(const AView: TComponent): TioViewCont
 begin
   Result := FindItemByView(AView);
   if not Assigned(Result) then
-    raise EioException.Create('TioViewContextRegister', 'GetItemByView', 'View not found.');
+    raise EioGenericException.Create('TioViewContextRegister', 'GetItemByView', 'View not found.');
 end;
 
 function TioViewRegisterBase.GetItemByViewContext(const AViewContext: TComponent): TioViewContextRegisterItem;
 begin
   Result := FindItemByViewContext(AViewContext);
   if not Assigned(Result) then
-    raise EioException.Create('TioViewContextRegister', 'GetItemByViewContext', 'ViewContext not found.');
+    raise EioGenericException.Create('TioViewContextRegister', 'GetItemByViewContext', 'ViewContext not found.');
 end;
 
 function TioViewRegisterBase.GetView(const Index: Integer): TComponent;
@@ -278,9 +278,9 @@ begin
   // NB: Ho dovuto posticiparlo con un timer perchè altrimenti con i TcxButton
   // della DevExpress c'erano dei problemi in alcuni casi
   // NB: If we are on an uniGUI application then doesn't use the timers but runs the code right away
-  if TioApplication.ProjectPlatform <> ppUniGUI then
-    FFreeViewsTimer.Enabled := True
-  else
+//  if TioApplication.ProjectPlatform <> ppUniGUI then      // Carlo Marona 2025-02-25
+//    FFreeViewsTimer.Enabled := True
+//  else
     _PostponedReleaseAllViewContexts;
 end;
 

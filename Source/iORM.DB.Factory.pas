@@ -42,7 +42,7 @@ uses
   System.Classes,
   System.Rtti, iORM.DB.ConnectionContainer, iORM.CommonTypes,
   iORM.Context.Interfaces, iORM.Context.Properties.Interfaces,
-  iORM.DB.QueryEngine;
+  iORM.DB.QueryEngine, iORM.Where.SqlItems;
 
 type
 
@@ -53,6 +53,8 @@ type
     class function WhereItemPropertyOID: IioSqlItemWhere;
     class function WhereItemTValue(AValue: TValue): IioSqlItemWhere;
     class function WhereItemPropertyEqualsTo(APropertyName: String; AValue: TValue): IioSqlItemWhere;
+    class function WhereItemPropertyIn(APropertyName: String; Values: TArray<TValue>): IioSqlItemWhere; overload;
+    class function WhereItemPropertyIn(APropertyName: String; Values: TArray<Integer>): IioSqlItemWhere; overload;
     class function WhereItemPropertyOIDEqualsTo(AValue: TValue): IioSqlItemWhere;
     class function CompareOperator: TioCompareOperatorRef;
     class function LogicRelation: TioLogicRelationRef;
@@ -75,7 +77,7 @@ type
 implementation
 
 uses
-  System.IOUtils, iORM.DB.Connection, iORM.DB.SqLite.SqlDataConverter, iORM.DB.SqLite.SqlGenerator, iORM.Where.SqlItems, System.SysUtils,
+  System.IOUtils, iORM.DB.Connection, iORM.DB.SqLite.SqlDataConverter, iORM.DB.SqLite.SqlGenerator, System.SysUtils,
   iORM.DB.QueryContainer, iORM.DB.TransactionCollection, iORM.DB.Firebird.SqlDataConverter, iORM.Exceptions, iORM.DB.Firebird.SqlGenerator,
 {$IFNDEF ioDelphiProfessional}
   iORM.DB.MSSqlServer.SqlGenerator, iORM.DB.MSSqlServer.SqlDataConverter,
@@ -127,35 +129,35 @@ var
   LConnectionInfo: TioConnectionInfo;
   function NewConnectionDB: IioConnectionDB;
   var
-    LConnection: TioInternalSqlConnection;
+    LInternalConnection: TioInternalSqlConnection;
     // DBPath: String;
   begin
     // Create the internal connection
-    LConnection := TioInternalSqlConnection.Create(nil);
+    LInternalConnection := TioInternalSqlConnection.Create(nil);
     // Load and set the connection parameters (from the connection manager)
-    LConnection.ConnectionDefName := AConnectionName;
+    LInternalConnection.ConnectionDefName := AConnectionName;
     // Disable Firedac MACRO
-    LConnection.ResourceOptions.MacroCreate := False;
-    LConnection.ResourceOptions.MacroExpand := False;
+    LInternalConnection.ResourceOptions.MacroCreate := False;
+    LInternalConnection.ResourceOptions.MacroExpand := False;
     // LConnection.ResourceOptions.PreprocessCmdText := False;
     // Set the monitor mode for the connection
 {$IFDEF MSWINDOWS}
     case TioConnectionMonitor.mode of
       mmDisabled:
-        LConnection.Params.MonitorBy := mbNone;
+        LInternalConnection.Params.MonitorBy := mbNone;
       mmRemote:
-        LConnection.Params.MonitorBy := mbRemote;
+        LInternalConnection.Params.MonitorBy := mbRemote;
       mmFlatFile:
-        LConnection.Params.MonitorBy := mbFlatFile;
+        LInternalConnection.Params.MonitorBy := mbFlatFile;
     end;
 {$ENDIF}
     // Extract the file path and create the directory if not exists
     // DBPath := ExtractFilePath(   Self.ConnectionManager.GetConnectionDefByName(AConnectionName).Params.Values['Database']   );
     // if not TDirectory.Exists(DBPath) then TDirectory.CreateDirectory(DBPath);
     // Open the connection
-    LConnection.Open;
+    LInternalConnection.Open;
     // Create the ioConnection and his QueryContainer and return it
-    Result := TioConnectionDB.Create(LConnection, Self.QueryContainer, TioConnectionManager.GetConnectionInfo(AConnectionName));
+    Result := TioConnectionDB.Create(LInternalConnection, Self.QueryContainer, TioConnectionManager.GetConnectionInfo(AConnectionName));
   end;
   function NewConnectionHttp: IioConnectionHttp;
   begin
@@ -165,7 +167,7 @@ var
 begin
   // Get connection info
   LConnectionInfo := TioConnectionManager.GetConnectionInfo(AConnectionName);
-  if LConnectionInfo.ConnectionType = TioConnectionType.ctHTML then
+  if LConnectionInfo.ConnectionType = TioConnectionType.ctHTTP then
     Result := NewConnectionHttp
   else
     Result := NewConnectionDB;
@@ -189,7 +191,7 @@ begin
   LConnection := Connection(AConnectionDefName);
   // Operation allowed only for DB connections
   if not LConnection.IsDBConnection then
-    raise EioException.Create(ClassName, 'Query', 'Operation not allowed by this type of connection.');
+    raise EioGenericException.Create(ClassName, 'Query', 'Operation not allowed by this type of connection.');
   // If the query is already present in the QueryContainer of the connection then get it and return...
   // ...else create a new query and insert it in the QueryContainer of the connection
   if not LConnection.AsDBConnection.QueryContainer.TryGetQuery(AQueryIdentity, Result) then
@@ -208,7 +210,7 @@ begin
   LConnection := Self.Connection(AConnectionDefName);
   // Operation allowed only for DB connections
   if not LConnection.IsDBConnection then
-    raise EioException.Create(Self.ClassName, 'Script' + 'Operation not allowed by this type of connection');
+    raise EioGenericException.Create(Self.ClassName, 'Script' + 'Operation not allowed by this type of connection');
   // Create the script component instance
   Result := TioScript.Create(LConnection, AScript);
 end;
@@ -225,7 +227,7 @@ begin
       Result := TioSqlDataConverterMSSqlServer;
 {$ENDIF}
   else
-    raise EioException.Create(ClassName + ': Connection type not found (SqlDataConverter).');
+    raise EioGenericException.Create(ClassName + ': Connection type not found (SqlDataConverter).');
   end;
 end;
 
@@ -251,7 +253,7 @@ begin
       Result := TioSqlGeneratorMSSqlServer;
 {$ENDIF}
   else
-    raise EioException.Create(ClassName + ': Connection type not found (SqlGenerator).');
+    raise EioGenericException.Create(ClassName + ': Connection type not found (SqlGenerator).');
   end;
 end;
 
@@ -273,6 +275,22 @@ end;
 class function TioDbFactory.WhereItemPropertyEqualsTo(APropertyName: String; AValue: TValue): IioSqlItemWhere;
 begin
   Result := TioSqlItemsWherePropertyEqualsTo.Create(APropertyName, AValue);
+end;
+
+class function TioDbFactory.WhereItemPropertyIn(APropertyName: String; Values: TArray<Integer>): IioSqlItemWhere;
+var
+  LValue: TValue;
+begin
+  LValue := TValue.From<TArray<integer>>(Values);
+  Result := TioSqlItemsWherePropertyIn.Create(APropertyName, LValue);
+end;
+
+class function TioDbFactory.WhereItemPropertyIn(APropertyName: String; Values: TArray<TValue>): IioSqlItemWhere;
+var
+  LValue: TValue;
+begin
+  LValue := TValue.From<TArray<TValue>>(Values);
+  Result := TioSqlItemsWherePropertyIn.Create(APropertyName, LValue);
 end;
 
 class function TioDbFactory.WhereItemPropertyOID: IioSqlItemWhere;

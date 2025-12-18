@@ -61,6 +61,7 @@ type
     property Pooled;
     property Server;
     property UserName;
+    property SynchroStrategy_Client;
     // Events
     property OnAfterCreateOrAlterDB;
     property OnBeforeCreateOrAlterDB;
@@ -83,7 +84,7 @@ procedure TioSQLServerConnectionDef.RegisterConnectionDef;
 begin
   inherited;
   ConnectionDef := TioConnectionManager.NewSQLServerConnectionDef(Server,
-    GetFullPathDatabase, UserName, Password, AsDefault,
+    GetFullPathDatabase, UserName, Password, AsDefault, SynchroStrategy_Client,
     Persistent, Pooled, Name);
   // Encript
   if not Encrypt.IsEmpty then

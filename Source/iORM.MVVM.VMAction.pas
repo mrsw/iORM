@@ -38,7 +38,8 @@ interface
 uses
   System.Classes, System.Generics.Collections, iORM.MVVM.Interfaces, iORM.LiveBindings.Interfaces,
   iORM.CommonTypes, iORM.LiveBindings.BSPersistence, iORM.StdActions.Interfaces,
-  iORM.MVVM.ViewContextProvider;
+  iORM.MVVM.ViewContextProvider, iORM.SynchroStrategy.Interfaces,
+  iORM.Abstraction;
 
 type
 
@@ -82,13 +83,14 @@ type
   TioVMActionCustom = class (TComponent, IioVMAction)
   strict private
     FBindedViewActionsContainer: TList<IioViewAction>;
+    FChecked: Boolean;
     FEnabled: Boolean;
     FExecutionMode: TioActionExecutionMode;
     FVisible: Boolean;
     // events
     FAfterExecute: TNotifyEvent;
     FBeforeExecute: TNotifyEvent;
-    FCanExecute: TioStdActionCanExecuteEvent;
+    FCanExecute: TioCanExecuteEvent;
     FOnUpdate: TNotifyEvent;
     function Get_Version: String;
     procedure _InternalExecute; virtual;
@@ -103,11 +105,13 @@ type
     procedure BindViewAction(const AViewAction: IioViewAction);
     procedure UnbindViewAction(const AViewAction: IioViewAction);
     procedure UnbindAllViewActions;
+    function GetChecked: Boolean;
     function GetEnabled: Boolean;
     function GetExecutionMode: TioActionExecutionMode;
     function GetName: TComponentName;
     function GetOwnerComponent: TComponent;
     function GetVisible: Boolean;
+    procedure SetChecked(const Value: Boolean);
     function GetCategory: string;
     procedure SetCategory(const Value: string);
     procedure SetEnabled(const Value: Boolean);
@@ -115,6 +119,7 @@ type
     procedure SetName(const Value: TComponentName); reintroduce;
     procedure SetVisible(const Value: Boolean);
     // properties
+    property Checked: Boolean read GetChecked write SetChecked default False;
     property Enabled: Boolean read GetEnabled write SetEnabled default True;
     property ExecutionMode: TioActionExecutionMode read GetExecutionMode write SetExecutionMode;
     property Name: TComponentName read GetName write SetName;
@@ -124,7 +129,7 @@ type
     // Events
     property AfterExecute: TNotifyEvent read FAfterExecute write FAfterExecute;
     property BeforeExecute: TNotifyEvent read FBeforeExecute write FBeforeExecute;
-    property CanExecute: TioStdActionCanExecuteEvent read FCanExecute write FCanExecute;
+    property CanExecute: TioCanExecuteEvent read FCanExecute write FCanExecute;
     property OnUpdate: TNotifyEvent read FOnUpdate write FOnUpdate;
   private
     FActionList: TioCustomVMActionList;
@@ -160,6 +165,7 @@ type
     property Owner;
   published
     // inherited properties
+    property Checked;
     property Enabled;
     property Name;
     property Visible;
@@ -326,7 +332,6 @@ type
     FAction_CloseQueryAction: IioBSSlaveAction;
     FAction_ReloadAction: IioBSSlaveAction;
     FAction_ShowOrSelectAction: IioBSSlaveAction;
-    FClearAfterExecute: Boolean;
     FDisableIfChangesDoesNotExists: Boolean;
     FDisableIfChangesExists: Boolean;
     FDisableIfSaved: Boolean;
@@ -348,7 +353,6 @@ type
     procedure _InternalUpdateStdAction; override;
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     // properties
-    property ClearAfterExecute: Boolean read FClearAfterExecute write FClearAfterExecute default True;
     property DisableIfChangesDoesNotExists: Boolean read FDisableIfChangesDoesNotExists write FDisableIfChangesDoesNotExists default False;
     property DisableIfChangesExists: Boolean read FDisableIfChangesExists write FDisableIfChangesExists default False;
     property DisableIfSaved: Boolean read FDisableIfSaved write FDisableIfSaved default False;
@@ -409,7 +413,6 @@ type
   published
     // inherited properties
     property Action_CloseQueryAction;
-    //property ClearAfterExecute; // Eliminata perchè poteva interferire con TioVMActionBSCloseQuery
     property DisableIfChangesDoesNotExists;
     property RaiseIfChangesDoesNotExists;
     property TargetBindSource;
@@ -427,7 +430,6 @@ type
   published
     // inherited properties
     property Action_CloseQueryAction;
-    //property ClearAfterExecute; // Eliminata perchè poteva interferire con TioVMActionBSCloseQuery
     property DisableIfChangesDoesNotExists;
     property RaiseIfChangesDoesNotExists;
     property RaiseIfRevertPointNotSaved;
@@ -451,7 +453,6 @@ type
   published
     // inherited properties
     property Action_CloseQueryAction;
-    //property ClearAfterExecute; // Eliminata perchè poteva interferire con TioVMActionBSCloseQuery
     property DisableIfChangesDoesNotExists;
     property RaiseIfChangesDoesNotExists;
     property RaiseIfRevertPointNotSaved;
@@ -637,7 +638,7 @@ type
     property AutoExec_Persist_AfterRevert: Boolean read FAutoExec_Persist_AfterRevert write FAutoExec_Persist_AfterRevert default False;
     // events
     property AfterRevert: TioStdAction_ETM_AfterRevertEvent read FAfterRevertEvent write FAfterRevertEvent;
-end;
+  end;
 
   TioVMActionBSCloseQuery = class(TioVMActionBSPersistenceCustom, IioBSCloseQueryAction, IioBSCloseQueryVMAction)
   strict private
@@ -753,6 +754,61 @@ end;
   // END: MVVM STANDARD ACTIONS TO SHOW AN OBJECT
   // =================================================================================================
 
+  // =================================================================================================
+  // BEGIN: MVVM STANDARD ACTIONS FOR SYNCHRONIZATION PURPOSES
+  // =================================================================================================
+
+  // DoSynchronization action
+  TioVMDoSynchronization = class(TioVMActionCustom)
+  strict private
+    // fields
+    FAutoexec_Enabled: Boolean;
+    FAutoexec_Interval: Integer;
+    FAutoexec_StartDelay: Integer;
+    FAutoexec_Timer: TioTimer;
+    FSynchroLevel: TioSynchroLevel;
+    FTargetSynchroStrategy: IioSynchroStrategy_Client;
+    // methods
+    procedure Autoexec_OnTimerEventHandler(Sender: TObject);
+    procedure SetAutoexec_Enabled(const Value: Boolean);
+    procedure SetAutoexec_Interval(const ASeconds: Integer);
+    procedure SetAutoexec_StartDelay(const ASeconds: Integer);
+    procedure SetTargetSynchroStrategy(const Value: IioSynchroStrategy_Client);
+  strict protected
+    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
+    procedure _InternalExecuteStdAction; override;
+    procedure _InternalUpdateStdAction; override;
+  public
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+    function HandlesTarget(Target: TObject): Boolean; override;
+    function Execute: Boolean; override;
+    function Update: Boolean; override;
+    // inherited properties
+    property Owner;
+  published
+    // inherited properties
+    property Enabled;
+    property Name;
+    property Visible;
+    property _Version;
+    // properties
+    property Autoexec_Enabled: Boolean read FAutoexec_Enabled write SetAutoexec_Enabled default False;
+    property Autoexec_Interval: Integer read FAutoexec_Interval write SetAutoexec_Interval default 60;
+    property Autoexec_StartDelay: Integer read FAutoexec_StartDelay write SetAutoexec_StartDelay default 3;
+    property SynchroLevel: TioSynchroLevel read FSynchroLevel write FSynchroLevel default slIncremental;
+    property TargetSynchroStrategy: IioSynchroStrategy_Client read FTargetSynchroStrategy write SetTargetSynchroStrategy;
+    // Events
+    property AfterExecute;
+    property BeforeExecute;
+    property CanExecute;
+    property OnUpdate;
+  end;
+
+  // =================================================================================================
+  // END: MVVM STANDARD ACTIONS FOR SYNCHRONIZATION PURPOSES
+  // =================================================================================================
+
   procedure RegisterVMActions(const CategoryName: string; const AClasses: array of TioVMActionCustomClass;
     Resource: TComponentClass);
   procedure UnRegisterVMActions(const AClasses: array of TioVMActionCustomClass);
@@ -790,13 +846,14 @@ constructor TioVMActionCustom.Create(AOwner: TComponent);
 begin
   inherited;
   FExecutionMode := emActive;
+  FChecked := False;
   FCategory := EmptyStr;
   FEnabled := True;
   FVisible := True;
   FBindedViewActionsContainer := TList<IioViewAction>.Create;
   // Solleva una eccezione se non siamo su un ViewModel
-//  if not Supports(Owner, IioViewModel) then
-//    raise EioException.Create(ClassName, 'Create', Format('Component "%s" can only be used on class "TioViewModel" or its descendants.', [ClassName]));
+  if not Supports(Owner, IioViewModel) then
+    raise EioGenericException.Create(ClassName, 'Create', Format('Component "%s" can only be used on class "TioViewModel" or its descendants.', [ClassName]));
 end;
 
 destructor TioVMActionCustom.Destroy;
@@ -816,6 +873,11 @@ function TioVMActionCustom.Update: Boolean;
 begin
   _UpdateOriginal;
   Result := False;
+end;
+
+function TioVMActionCustom.GetChecked: Boolean;
+begin
+  Result := FChecked;
 end;
 
 function TioVMActionCustom.GetCategory: string;
@@ -944,14 +1006,18 @@ procedure TioVMActionCustom._UpdateOriginal;
 var
   LViewAction: IioViewAction;
 begin
-  // Execute the ViewAction.onBeforeUpdate event
-  for LViewAction in FBindedViewActionsContainer do
-    LViewAction.DoBeforeUpdate;
-  // Execute the VMAction.onUpdate event if assigned (or a standard action)
-  _InternalUpdate;
-  // Execute the ViewAction.onAfterUpdatee event ia assigned or standard action
-  for LViewAction in FBindedViewActionsContainer do
-    LViewAction.DoAfterUpdate;
+  try  // Carlo Marona 2025-02-11
+    // Execute the ViewAction.onBeforeUpdate event
+    for LViewAction in FBindedViewActionsContainer do
+      LViewAction.DoBeforeUpdate;
+    // Execute the VMAction.onUpdate event if assigned (or a standard action)
+    _InternalUpdate;
+    // Execute the ViewAction.onAfterUpdatee event ia assigned or standard action
+    for LViewAction in FBindedViewActionsContainer do
+      LViewAction.DoAfterUpdate;
+  except
+
+  end;
 end;
 
 procedure TioVMActionCustom.BindViewAction(const AViewAction: IioViewAction);
@@ -959,6 +1025,8 @@ begin
   FBindedViewActionsContainer.Add(AViewAction);
   AViewAction.VMAction := Self;
   // Propagate Enabled/Visible to the new registered ViewAction if linked
+  if AViewAction.CheckedLinkedToVMAction then
+    AViewAction.Checked := FChecked;
   if AViewAction.EnabledLinkedToVMAction then
     AViewAction.Enabled := FEnabled;
   if AViewAction.VisibleLinkedToVMAction then
@@ -977,6 +1045,19 @@ var
 begin
   for I := FBindedViewActionsContainer.Count-1 downto 0 do
     UnbindViewAction(FBindedViewActionsContainer[I]);
+end;
+
+procedure TioVMActionCustom.SetChecked(const Value: Boolean);
+var
+  LViewAction: IioViewAction;
+begin
+  if Value <> FChecked then
+  begin
+    FChecked := Value;
+    for LViewAction in FBindedViewActionsContainer do
+      if LViewAction.CheckedLinkedToVMAction then
+        LViewAction.Checked := Value;
+  end;
 end;
 
 procedure TioVMActionCustom.SetActionList(const Value: TioCustomVMActionList);
@@ -1113,7 +1194,7 @@ end;
 procedure TioVMActionBSSelectCurrent.SetTargetBindSource(const Value: IioStdActionTargetBindSource);
 begin
   if not(csLoading in ComponentState) and FIsSlave then
-    raise EioException.Create(ClassName, 'SetTargetBindSource', 'The "TargetBindSource" property of a "..SelectCurrent" action is read-only when the action itself is nested into a "ShowOrSelect" action')
+    raise EioGenericException.Create(ClassName, 'SetTargetBindSource', 'The "TargetBindSource" property of a "..SelectCurrent" action is read-only when the action itself is nested into a "ShowOrSelect" action')
   else
     inherited;
 end;
@@ -1142,7 +1223,7 @@ var
   LTargetBindSource: IioStdActionTargetBindSource;
 begin
   if Assigned(AObj) and not Supports(AObj, IioStdActionTargetBindSource, LTargetBindSource) then
-    raise EioException.Create(ClassName, '_SetTargetBindSource', 'AObj does not implements IioStdActionTargetBindSource interface');
+    raise EioGenericException.Create(ClassName, '_SetTargetBindSource', 'AObj does not implements IioStdActionTargetBindSource interface');
   FIsSlave := False;
   SetTargetBindSource(LTargetBindSource);
   FIsSlave := True;
@@ -1181,7 +1262,6 @@ end;
 constructor TioVMActionBSPersistenceCustom.Create(AOwner: TComponent);
 begin
   inherited;
-  FClearAfterExecute := True;
   FAction_CloseQueryAction := nil;
   FDisableIfChangesDoesNotExists := False;
   FDisableIfChangesExists := False;
@@ -1247,7 +1327,7 @@ end;
 procedure TioVMActionBSPersistenceCustom.SetTargetBindSource(const Value: IioMasterBindSource);
 begin
   if not(csLoading in ComponentState) and FIsSlave then
-    raise EioException.Create(ClassName, 'SetTargetBindSource', 'The "TargetBindSource" property of a "..SelectCurrent" action is read-only when the action itself is nested into a "ShowOrSelect" action');
+    raise EioGenericException.Create(ClassName, 'SetTargetBindSource', 'The "TargetBindSource" property of a "..SelectCurrent" action is read-only when the action itself is nested into a "ShowOrSelect" action');
   if Value <> FTargetBindSource then
   begin
     FTargetBindSource := Value;
@@ -1287,7 +1367,7 @@ var
   LTargetBindSource: IioMasterBindSource;
 begin
   if Assigned(AObj) and not Supports(AObj, IioMasterBindSource, LTargetBindSource) then
-    raise EioException.Create(ClassName, '_SetTargetBindSource', 'AObj does not implements IioStdActionTargetBindSource interface');
+    raise EioGenericException.Create(ClassName, '_SetTargetBindSource', 'AObj does not implements IioStdActionTargetBindSource interface');
   FIsSlave := False;
   SetTargetBindSource(LTargetBindSource);
   FIsSlave := True;
@@ -1325,7 +1405,7 @@ end;
 procedure TioVMActionBSPersistencePersist._InternalExecuteStdAction;
 begin
   TargetBindSource.Refresh(True); // Otherwise, in some cases, an outdated value persisted
-  TargetBindSource.Persistence.Persist(RaiseIfChangesDoesNotExists, ClearAfterExecute);
+  TargetBindSource.Persistence.Persist(RaiseIfChangesDoesNotExists);
   // Execute slave actions
   TioStdActionCommonBehaviour.ExecuteSlaveAction(Action_CloseQueryAction);
 end;
@@ -1341,7 +1421,7 @@ end;
 
 procedure TioVMActionBSPersistenceRevert._InternalExecuteStdAction;
 begin
-  TargetBindSource.Persistence.Revert(RaiseIfRevertPointNotSaved, RaiseIfChangesDoesNotExists, ClearAfterExecute);
+  TargetBindSource.Persistence.Revert(RaiseIfRevertPointNotSaved, RaiseIfChangesDoesNotExists);
   // Execute slave actions
   TioStdActionCommonBehaviour.ExecuteSlaveAction(Action_CloseQueryAction);
 end;
@@ -1367,7 +1447,7 @@ var
   LIsDeleting: Boolean;
 begin
   LIsDeleting := TargetBindSource.Persistence.IsInserting;
-  TargetBindSource.Persistence.RevertOrDelete(RaiseIfRevertPointNotSaved, RaiseIfChangesDoesNotExists, ClearAfterExecute);
+  TargetBindSource.Persistence.RevertOrDelete(RaiseIfRevertPointNotSaved, RaiseIfChangesDoesNotExists);
   // Execute slave actions
   if (LIsDeleting and FAutoExec_CloseQueryAction_AfterDelete) or (not LIsDeleting and FAutoExec_CloseQueryAction_AfterRevert) then
     TioStdActionCommonBehaviour.ExecuteSlaveAction(Action_CloseQueryAction);
@@ -1451,7 +1531,7 @@ begin
         Exit;
       end
       else
-        raise EioException.Create(Self.ClassName, '_InternalExecuteStdAction', 'Invalid new instance (nil)');
+        raise EioGenericException.Create(Self.ClassName, '_InternalExecuteStdAction', 'Invalid new instance (nil)');
     end;
     // New instance as Interface (OnNewInstanceAsInterface event handler)
     if Assigned(FOnNewInstanceAsInterface) then
@@ -1463,7 +1543,7 @@ begin
         Exit;
       end
       else
-        raise EioException.Create(Self.ClassName, '_InternalExecuteStdAction', 'Invalid new instance (nil)');
+        raise EioGenericException.Create(Self.ClassName, '_InternalExecuteStdAction', 'Invalid new instance (nil)');
     end;
     // New instance ny EntityType/Alias
     if not FEntityTypeName.IsEmpty and io.di.Locate(FEntityTypeName, FEntityTypeAlias).Exist then
@@ -1488,13 +1568,17 @@ begin
         end;
       end
       else
-        raise EioException.Create(Self.ClassName, 'ExecuteTarget', 'Invalid new instance (nil)');
+        raise EioGenericException.Create(Self.ClassName, 'ExecuteTarget', 'Invalid new instance (nil)');
     end;
     // New instance not provided (created by the ABSAdapter itself)
     TargetBindSource.Persistence.Append(RaiseIfRevertPointSaved, RaiseIfChangesExists);
   finally
     // Execute slave actions
-    TioStdActionCommonBehaviour.ExecuteSlaveAction(Action_ShowOrSelectAction);
+    if Assigned(Action_ShowOrSelectAction) then
+    begin
+      TioStdActionCommonBehaviour.ExecuteSlaveAction(Action_ShowOrSelectAction);
+      TargetBindSource.Persistence.Clear;
+    end;
   end;
 end;
 
@@ -1533,7 +1617,7 @@ begin
         Exit;
       end
       else
-        raise EioException.Create(Self.ClassName, '_InternalExecuteStdAction', 'Invalid new instance (nil)');
+        raise EioGenericException.Create(Self.ClassName, '_InternalExecuteStdAction', 'Invalid new instance (nil)');
     end;
     // New instance as Interface (OnNewInstanceAsInterface event handler)
     if Assigned(FOnNewInstanceAsInterface) then
@@ -1545,7 +1629,7 @@ begin
         Exit;
       end
       else
-        raise EioException.Create(Self.ClassName, '_InternalExecuteStdAction', 'Invalid new instance (nil)');
+        raise EioGenericException.Create(Self.ClassName, '_InternalExecuteStdAction', 'Invalid new instance (nil)');
     end;
     // New instance ny EntityType/Alias
     if not FEntityTypeName.IsEmpty and io.di.Locate(FEntityTypeName, FEntityTypeAlias).Exist then
@@ -1570,13 +1654,17 @@ begin
         end;
       end
       else
-        raise EioException.Create(Self.ClassName, 'ExecuteTarget', 'Invalid new instance (nil)');
+        raise EioGenericException.Create(Self.ClassName, 'ExecuteTarget', 'Invalid new instance (nil)');
     end;
     // New instance not provided (created by the ABSAdapter itself)
     TargetBindSource.Persistence.Insert(RaiseIfRevertPointSaved, RaiseIfChangesExists);
   finally
     // Execute slave actions
-    TioStdActionCommonBehaviour.ExecuteSlaveAction(Action_ShowOrSelectAction);
+    if Assigned(Action_ShowOrSelectAction) then
+    begin
+      TioStdActionCommonBehaviour.ExecuteSlaveAction(Action_ShowOrSelectAction);
+      TargetBindSource.Persistence.Clear;
+    end;
   end;
 end;
 
@@ -1726,7 +1814,7 @@ begin
         end;
       end
       else
-        raise EioException.Create(ClassName, '_InternalExecuteStdAction', 'Owner does not implement the "IioViewModelInternal" interface.');
+        raise EioGenericException.Create(ClassName, '_InternalExecuteStdAction', 'Owner does not implement the "IioViewModelInternal" interface.');
     end;
   finally
     FExecuting := False;
@@ -1869,7 +1957,7 @@ end;
 procedure TioVMActionBSShowOrSelect.SetTargetBindSource(const Value: IioStdActionTargetBindSource);
 begin
   if not(csLoading in ComponentState) and FIsSlave then
-    raise EioException.Create(ClassName, 'SetTargetBindSource', 'The "TargetBindSource" property of a "..SelectCurrent" action is read-only when the action itself is nested into a "ShowOrSelect" action');
+    raise EioGenericException.Create(ClassName, 'SetTargetBindSource', 'The "TargetBindSource" property of a "..SelectCurrent" action is read-only when the action itself is nested into a "ShowOrSelect" action');
   if Value <> FTargetBindSource then
   begin
     FTargetBindSource := Value;
@@ -2106,7 +2194,7 @@ var
   LTargetBindSource: IioStdActionTargetBindSource;
 begin
   if Assigned(AObj) and not Supports(AObj, IioStdActionTargetBindSource, LTargetBindSource) then
-    raise EioException.Create(ClassName, '_SetTargetBindSource', 'AObj does not implements IioStdActionTargetBindSource interface');
+    raise EioGenericException.Create(ClassName, '_SetTargetBindSource', 'AObj does not implements IioStdActionTargetBindSource interface');
   FIsSlave := False;
   SetTargetBindSource(LTargetBindSource);
   FIsSlave := True;
@@ -2174,7 +2262,7 @@ begin
   begin
     // Controlla se la ShowOrSelect action è realmente una action di questo tipo
     if not (Action_ShowOrSelectAction is TioVMActionBSShowOrSelect) then
-      raise EioException.Create(ClassName, '_ShowRevertedObj',
+      raise EioGenericException.Create(ClassName, '_ShowRevertedObj',
         Format('"Action_ShowOrSelectAction" property is of the wrong type "%s" insitead of "TioBSShowOrSelect".',
         [(Action_ShowOrSelectAction as TObject).ClassName]));
     // Estrae il tipo reale della ShowOrSelect action per poter poi accedere a informazioni che riguardano
@@ -2268,7 +2356,7 @@ begin
   begin
     // Controlla se la ShowOrSelect action è realmente una action di questo tipo
     if not (Action_ShowOrSelectAction is TioVMActionBSShowOrSelect) then
-      raise EioException.Create(ClassName, '_ShowRevertedObj',
+      raise EioGenericException.Create(ClassName, '_ShowRevertedObj',
         Format('"Action_ShowOrSelectAction" property is of the wrong type "%s" insitead of "TioBSShowOrSelect".',
         [(Action_ShowOrSelectAction as TObject).ClassName]));
     // Estrae il tipo reale della ShowOrSelect action per poter poi accedere a informazioni che riguardano
@@ -2304,6 +2392,142 @@ procedure TioVMAction._InternalUpdateStdAction;
 begin
   inherited;
   Enabled := Assigned(FOnExecute);
+end;
+
+{ TioVMDoSynchronization }
+
+procedure TioVMDoSynchronization.Autoexec_OnTimerEventHandler(Sender: TObject);
+begin
+  if FAutoexec_Enabled and Assigned(FTargetSynchroStrategy) then
+  begin
+    if FTargetSynchroStrategy.IsReady then
+    begin
+      FAutoexec_Timer.Interval := FAutoexec_Interval * 1000; // Seconds
+      Self.Execute;
+    end;
+  end
+  else
+    SetAutoexec_Enabled(False);
+end;
+
+constructor TioVMDoSynchronization.Create(AOwner: TComponent);
+begin
+  inherited;
+  FAutoexec_Enabled := False;
+  FAutoexec_Interval := 60;
+  FAutoexec_StartDelay := 3;
+  FSynchroLevel := slIncremental;
+  FTargetSynchroStrategy := nil;
+  // Autoexec internal timer
+  if not(csDesigning in ComponentState) then
+    FAutoexec_Timer := TioTimer.CreateNewTimer
+  else
+    FAutoexec_Timer := nil;
+end;
+
+destructor TioVMDoSynchronization.Destroy;
+begin
+  if Assigned(FAutoexec_Timer) then
+    FAutoexec_Timer.Free;
+  inherited;
+end;
+
+function TioVMDoSynchronization.Execute: Boolean;
+begin
+  Result := False;
+  if Assigned(FTargetSynchroStrategy) then
+    inherited;
+end;
+
+function TioVMDoSynchronization.HandlesTarget(Target: TObject): Boolean;
+begin
+  Result := Assigned(Target);
+//  Result := Assigned(Target) and Supports(FTargetSynchroStrategy, IioSynchroStrategy_Client) and
+//    FTargetSynchroStrategy.isReady;
+end;
+
+procedure TioVMDoSynchronization.Notification(AComponent: TComponent; Operation: TOperation);
+begin
+  inherited Notification(AComponent, Operation);
+  if (Operation = opRemove) and (AComponent = (FTargetSynchroStrategy as TComponent)) then
+    FTargetSynchroStrategy := nil;
+end;
+
+procedure TioVMDoSynchronization.SetAutoexec_Enabled(const Value: Boolean);
+begin
+  if Value = FAutoexec_Enabled then
+    Exit;
+  if Assigned(FAutoexec_Timer) then //aka "if not at designtime"
+  begin
+    if Value then
+    begin
+      FAutoexec_Timer.Interval := FAutoexec_StartDelay * 1000; // Seconds
+      FAutoexec_Timer.OnTimer := Autoexec_OnTimerEventHandler;
+    end
+    else
+      FAutoexec_Timer.Enabled := False;
+  end;
+  FAutoexec_Enabled := Value;
+end;
+
+procedure TioVMDoSynchronization.SetAutoexec_Interval(const ASeconds: Integer);
+begin
+  if ASeconds = FAutoexec_Interval then
+    Exit;
+  FAutoexec_Interval := ASeconds;
+  // if Autoexec_Enabled is true then disable ad re-enable it to force the load af the new value
+  if FAutoexec_Enabled then
+  begin
+    SetAutoexec_Enabled(False);
+    SetAutoexec_Enabled(True);
+  end;
+end;
+
+procedure TioVMDoSynchronization.SetAutoexec_StartDelay(const ASeconds: Integer);
+begin
+  if ASeconds = FAutoexec_StartDelay then
+    Exit;
+  FAutoexec_StartDelay := ASeconds;
+  // if Autoexec_Enabled is true then disable ad re-enable it to force the load af the new value
+  if FAutoexec_Enabled then
+  begin
+    SetAutoexec_Enabled(False);
+    SetAutoexec_Enabled(True);
+  end;
+end;
+
+procedure TioVMDoSynchronization.SetTargetSynchroStrategy(const Value: IioSynchroStrategy_Client);
+begin
+  if @Value <> @FTargetSynchroStrategy then
+  begin
+    FTargetSynchroStrategy := Value;
+    if Value <> nil then
+      (Value as TComponent).FreeNotification(Self);
+  end;
+end;
+
+function TioVMDoSynchronization.Update: Boolean;
+begin
+  Result := False;
+  if Assigned(FTargetSynchroStrategy) then
+    inherited
+  else
+    Enabled := False;
+end;
+
+procedure TioVMDoSynchronization._InternalExecuteStdAction;
+begin
+  inherited;
+  FTargetSynchroStrategy.DoSynchronization(FSynchroLevel);
+end;
+
+procedure TioVMDoSynchronization._InternalUpdateStdAction;
+begin
+  inherited;
+  Enabled := Assigned(FTargetSynchroStrategy) and FTargetSynchroStrategy.isReady;
+  // Autoenable/disable the Autoexec_Timer depending on Autoexec_Enabled property value, TargetSynchroStrategy and FAutoexec_Timer both assigned
+  if FAutoexec_Enabled and Assigned(FTargetSynchroStrategy) and Assigned(FAutoexec_Timer) and not FAutoexec_Timer.Enabled then
+    FAutoexec_Timer.Enabled := Enabled;
 end;
 
 { TioCustomVMActionList }

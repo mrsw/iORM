@@ -157,7 +157,7 @@ begin
       end;
   // Else raise exception
   else
-    raise EioException.Create('TioBSNotification', 'Create',
+    raise EioGenericException.Create('TioBSNotification', 'Create',
       Format('Notification type not recognized (%s)'#13'It may be that you have to use a specific constructor.',
       [TioUtilities.EnumToString<TioBSNotificationType>(ANotificationType)]));
   end;
@@ -176,7 +176,7 @@ begin
   StopAtTheFirstMasterBS := True;
   // Payload
   PayloadAsString := ADeletedObj.ClassName;
-  PayloadAsInteger := TioUtilities.ExtractOID(ADeletedObj);
+  PayloadAsInteger := TioUtilities.ObjToID(ADeletedObj);
 end;
 
 constructor TioBSNotification.CreateSUDRegisterObjOnEdit(const ACurrentObj: TObject; const AMasterPropertyPath: String);

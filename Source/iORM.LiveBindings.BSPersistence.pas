@@ -148,11 +148,10 @@ type
     constructor Create(const ABSPersistenceClient: IioMasterBindSource);
     destructor Destroy; override;
     procedure SaveRevertPoint(const ARaiseIfAlreadySavedRevertPoint: Boolean = True);
-    procedure Revert(const ARaiseIfRevertPointNotSaved: Boolean = False; const ARaiseIfNoChanges: Boolean = False; const AClearAfterExecute: Boolean = True);
-    procedure RevertOrDelete(const ARaiseIfRevertPointNotSaved: Boolean = False; const ARaiseIfNoChanges: Boolean = False;
-      const AClearAfterExecute: Boolean = True);
+    procedure Revert(const ARaiseIfRevertPointNotSaved: Boolean = False; const ARaiseIfNoChanges: Boolean = False);
+    procedure RevertOrDelete(const ARaiseIfRevertPointNotSaved: Boolean = False; const ARaiseIfNoChanges: Boolean = False);
     procedure Clear(const ARaiseIfChangesExists: Boolean = True);
-    procedure Persist(const ARaiseIfNoChanges: Boolean = False; const AClear: Boolean = True);
+    procedure Persist(const ARaiseIfNoChanges: Boolean = False);
     procedure Delete(const ARaiseIfSavedRevertPointExists: Boolean = False; const ARaiseIfChangesExists: Boolean = False);
     procedure Reload(const ARaiseIfSavedRevertPointExists: Boolean = False; const ARaiseIfChangesExists: Boolean = False);
     procedure Append(const ARaiseIfSavedRevertPointExists: Boolean = False; const ARaiseIfChangesExists: Boolean = False); overload;
@@ -423,7 +422,7 @@ end;
 
 function TioBSPersistence.IsInserting: Boolean;
 begin
-  Result := (FBindSource.Current <> nil) and (FIsInserting or (TioUtilities.ExtractOID(FBindSource.Current) = 0));
+  Result := (FBindSource.Current <> nil) and (FIsInserting or (TioUtilities.ObjToID(FBindSource.Current) = 0));
 end;
 
 function TioBSPersistence.IsSavedRevertPoint: Boolean;
@@ -471,21 +470,25 @@ begin
   Result := TioUtilities.EnumToString<TioBSPersistenceState>(State);
 end;
 
-procedure TioBSPersistence.Persist(const ARaiseIfNoChanges: Boolean = False; const AClear: Boolean = True);
+procedure TioBSPersistence.Persist(const ARaiseIfNoChanges: Boolean = False);
 begin
   CheckUnassigned('Persist', True);
   if ARaiseIfNoChanges and (State < osChanged) then
     raise EioBindSourceObjStateException.Create(ClassName, 'Persist', 'There are''t changes to persist');
   FBindSource.PersistCurrent;
-  if AClear then
-    Clear(False);
+  // Clear saved state
+  // NB: Il clear è stato spostato in TioCommonBSAAnonymousMethodFactory.GetPersistCurrentExecuteMethod perchè
+  //      altrimenti se si metteva Async = True non funzionava bene in quanto gli SmartUpdateDetectionSystems
+  //      venivano azzeerati (clear) prima dell'esecuzione del persist nel thread secondario e quindi non salvava
+  //      nulla. Lo lascio commentato anche qui per ricordare di non rimetterlo.
+  //Clear(False);
 end;
 
 procedure TioBSPersistence.Reload(const ARaiseIfSavedRevertPointExists: Boolean; const ARaiseIfChangesExists: Boolean);
 begin
   // Reload from a bind source is possible only is ALoadType is NOT set to ftManual
   if FBindSource.LoadType = ltManual then
-    raise EioException.Create(ClassName, 'Reload',
+    raise EioGenericException.Create(ClassName, 'Reload',
       Format('Invoking the "Reload" method is NOT allowed if the "LoadType" property is set to "ltManual".'#13#13'Please set the property "LoadType" of the bind source "%s" (maybe a DataSet or BindSource) to a value other than "ltManual" and try again.',
       [FBindSource.GetName]));
   // Il primo "CheckUnassigned" viene usato per verificare solamente se un BindSOurce è assegnato
@@ -516,20 +519,18 @@ end;
 // FBindSource.Refresh(True);
 // end;
 // --- OLD CODE ---
-procedure TioBSPersistence.Revert(const ARaiseIfRevertPointNotSaved, ARaiseIfNoChanges, AClearAfterExecute: Boolean);
+procedure TioBSPersistence.Revert(const ARaiseIfRevertPointNotSaved: Boolean = False; const ARaiseIfNoChanges: Boolean = False);
 begin
   CheckUnassigned('Revert', True);
   // Execute the revert
   _InternalRevert(ARaiseIfRevertPointNotSaved, ARaiseIfNoChanges);
   // Clear saved state and refresh
-  if AClearAfterExecute then
-    Clear(False);
+  Clear(False);
   if FBindSource.Current <> nil then
     FBindSource.Refresh(True);
 end;
 
-procedure TioBSPersistence.RevertOrDelete(const ARaiseIfRevertPointNotSaved: Boolean = False; const ARaiseIfNoChanges: Boolean = False;
-  const AClearAfterExecute: Boolean = True);
+procedure TioBSPersistence.RevertOrDelete(const ARaiseIfRevertPointNotSaved: Boolean = False; const ARaiseIfNoChanges: Boolean = False);
 begin
   CheckUnassigned('Revert', True);
   // Depending on LoadType property...
@@ -540,8 +541,7 @@ begin
   else if FBindSource.LoadType = ltAuto then
     _InternalRevertWhenAutoLoadType(ARaiseIfRevertPointNotSaved, ARaiseIfNoChanges);
   // Clear saved state and refresh
-  if AClearAfterExecute then
-    Clear(False);
+  Clear(False);
   if FBindSource.Current <> nil then
     FBindSource.Refresh(True);
 end;
@@ -580,7 +580,7 @@ begin
   begin
     LSourceBS := FBindSource.GetSourceBS;
     if not Assigned(LSourceBS) then
-      raise EioException.Create(ClassName, '_InternalRevertWhenFromBSLoadType',
+      raise EioGenericException.Create(ClassName, '_InternalRevertWhenFromBSLoadType',
         Format('In component "%s" the "LoadType" property has been set to one of this values ("ltFromBSAsIs" or "ltFromBSReload" or "ltFromBSReloadNewInstance") but the "SourceXXX" property (maybe SourceDataSet, SourcePBS or SourcePresenter) has been left blank.'
         + #13#13'iORM is therefore unable to continue.'#13#13'Please set the "SourceXXX" property of bind source "%s" and then try again.',
         [FBindSource.GetName, FBindSource.GetName]));

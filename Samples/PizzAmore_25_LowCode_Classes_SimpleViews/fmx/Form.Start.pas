@@ -8,7 +8,8 @@ uses
   System.Actions, FMX.ActnList, iORM.Abstraction.FMX, iORM, iORM.Attributes, iORM.CommonTypes, iORM.DBBuilder.Interfaces, iORM.DB.ConnectionDef,
   iORM.MVVM.Interfaces, iORM.MVVM.ViewContextProvider, iORM.StdActions.Fmx, Data.Bind.GenData, Fmx.Bind.GenData, iORM.Where.Interfaces, Data.Bind.Components,
   Data.Bind.ObjectScope, iORM.LiveBindings.PrototypeBindSource.Custom, iORM.LiveBindings.PrototypeBindSource.Master,
-  FireDAC.Phys.SQLiteWrapper.Stat, FMX.Edit;
+  FireDAC.Phys.SQLiteWrapper.Stat, FMX.Edit, iORM.SynchroStrategy.Interfaces, System.Generics.Collections, iORM.SynchroStrategy.Custom,
+  iORM.SynchroStrategy.EtmBased;
 
 type
 
@@ -24,7 +25,7 @@ type
     LayoutMain: TLayout;
     Layout1: TLayout;
     Label2: TLabel;
-    Label1: TLabel;
+    Z: TLabel;
     ImageLogo: TImage;
     ActionList1: TActionList;
     ioFMX1: TioFMX;
@@ -34,8 +35,11 @@ type
     acShowCustomers: TioBSShowOrSelect;
     acShowPizzas: TioBSShowOrSelect;
     acShowOrders: TioBSShowOrSelect;
-    procedure SQLiteConnAfterCreateOrAlterDB(const Sender: TioCustomConnectionDef; const ADBStatus: TioDBBuilderEngineResult; const AScript,
-      AWarnings: TStrings);
+    ServerConn: TioSQLiteConnectionDef;
+    SynchroStrategy: TioEtmSynchroStrategy_Client;
+    HttpConn: TioHttpConnectionDef;
+    ButtonDoSynchronization: TButton;
+    acDoSynchronization: TioDoSynchronization;
     procedure VCProviderRequest(const Sender: TObject; out ResultViewContext: TComponent);
     procedure VCProviderRelease(const Sender: TObject; const AView, AViewContext: TComponent);
     procedure VCProviderAfterRequest(const Sender: TObject; const AView, AViewContext: TComponent);
@@ -48,16 +52,7 @@ var
 
 implementation
 
-uses
-  Utils.SampleData;
-
 {$R *.fmx}
-
-procedure TStartForm.SQLiteConnAfterCreateOrAlterDB(const Sender: TioCustomConnectionDef; const ADBStatus: TioDBBuilderEngineResult; const AScript,
-  AWarnings: TStrings);
-begin
-  TSampleData.CheckForSampleDataCreation;
-end;
 
 procedure TStartForm.VCProviderRequest(const Sender: TObject; out ResultViewContext: TComponent);
 begin

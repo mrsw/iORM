@@ -349,11 +349,14 @@ type
     FCommaSepFieldList: String;
     FIndexOrientation: TioIndexOrientation;
     FUnique: Boolean;
+    FExplicitName: boolean;
   public
     constructor Create(const AIndexName: String; ACommaSepFieldList: String; const AIndexOrientation: TioIndexOrientation = ioAscending;
       const AUnique: Boolean = False); overload;
     constructor Create(ACommaSepFieldList: String; const AIndexOrientation: TioIndexOrientation = ioAscending; const AUnique: Boolean = False); overload;
     constructor Create(const AIndexOrientation: TioIndexOrientation = ioAscending; const AUnique: Boolean = False); overload;
+
+    property ExplicitName: boolean read FExplicitName;  // Carlo Marona (2025-10-21): Property added to know when the index name was passed by the user or set by the iORM
     property IndexName: String read FIndexName;
     property CommaSepFieldList: String read FCommaSepFieldList write FCommaSepFieldList;
     property IndexOrientation: TioIndexOrientation read FIndexOrientation;
@@ -506,36 +509,76 @@ type
 
 {$ENDREGION} // END OF DEPENDENCY INJECTION ATTRIBUTES
 
+{$REGION '===== CONFLICT STRATEGY ATTRIBUTES ====='}
+
+  // Base String attribute
+  // NOTE: THIS ATTRIBUTE IS DECLARED INTO iORM.ConflictStrategy.Interfaces (not here) TO AVOID CIRCULAR REFERENCE
+  // NOTE: THIS ATTRIBUTE IS DECLARED INTO iORM.ConflictStrategy.Interfaces (not here) TO AVOID CIRCULAR REFERENCE
+  // NOTE: THIS ATTRIBUTE IS DECLARED INTO iORM.ConflictStrategy.Interfaces (not here) TO AVOID CIRCULAR REFERENCE
+  // ioConflictStrategyAttribute = class(TCustomAttribute)
+  // ioDeleteConflictStrategyAttribute = class(TCustomAttribute)
+  // ioInsertConflictStrategyAttribute = class(TCustomAttribute)
+  // ioUpdateConflictStrategyAttribute = type ioDeleteConflictStrategyAttribute;
+
+{$ENDREGION} // END ETM ATTRIBUTES
+
 {$REGION '===== ETM ATTRIBUTES & TIMESLOT ====='}
+
+  // TimeSlot Synchro State
+  TioEtmTimeSlotSynchroState = (stRegular, stToBeSynchronized, stSynchronized_SentToServer, stSynchronized_ReceivedFromServer, stSynchronized_ReceivedFromClient);
 
   // Base class for ell ETM repositories
   TioEtmTimeSlotRef = class of TioEtmCustomTimeSlot;
 
+  // NB: Per la nuova gestione dei conflitti servirà la possibilità di memorizzare due data e ora, una che sarà il momento
+  // quando è stata fatto l'update sul DB remoto (es: mobile) e l'altra la data e ora di quanto è stato fatto l'update
+  // sul database centrale durante la fase di sincronizzazione.
+  [ioNotPersistedEntity]
   TioEtmCustomTimeSlot = class
   private
     FID: Integer;
     FDateAndTime: TioObjCreated;
-    FUserID: TioObjCreatedUserID;
-    FUserName: TioObjCreatedUserName;
+    // Entity related props
     [ioVarchar(60)]
     FEntityClassName: String;
     FEntityID: Integer;
-    FEntityVersion: Integer;
-    FRevertedFromVersion: Integer;
+    FEntityFromVersion: Integer;
+    FEntityToVersion: Integer;
+    FEntityUpdated: TDateTime;
     [ioBinary('1')]
     FEntityState: String;
-    [ioBinary('1')]
-    FRemoteEntityState: String;
-    FEventType: TioEtmEventType;
-    FConflictType: TioEtmConflictType;
+    // User related props
+    FUserID: TioObjCreatedUserID;
+    FUserName: TioObjCreatedUserName;
+    // Persistence related props
+    FActionType: TioPersistenceActionType;
+    FIntentType: TioPersistenceIntentType;
+    FBlindLevel: Byte;
+    FConflictDetected: Boolean;
+    FConflictState: TioPersistenceConflictState;
+    FConflictStrategyName: String;
+    // Conflict check by human related props
+    FConflictCheckedByHuman: Boolean;
+    FConflictCheckedByHuman_ID: Integer;
+    FConflictCheckedByHuman_Name: String;
+    FConflictCheckedByHuman_DateTime: TDateTime;
+    // Synchronization
+    FTimeSlotSynchroState: TioEtmTimeSlotSynchroState;
     // NB: Questo è un anonymous method che viene passato dal BindSource che sta esponendo il TimeSlot stesso e che permette
     // di risalire alla versione corrente della entità attraverso la catena "ETMBindSource.etmFor.Current"
     [ioSkip]
     FExtractCurrentEntityFunc: TFunc<TObject>;
+    // BlindLevel props
+    function GetBlindLevel_AutoUpdateProps: Boolean;
+    function GetBlindLevel_DetectObjExists: Boolean;
+    function GetBlindLevel_DetectConflicts: Boolean;
+    // Smart properties
     function GetSmartEntityInfo: String;
     function GetSmartEntityVersion: String;
     function GetSmartUser: String;
-    function GetSmartEventType: String;
+    function GetSmartActionType: String;
+    function GetSmartConflictInfo: String;
+    function GetSmartConflictCheckedByHuman: String;
     function GetSmartDescription: String;
     function GetSmartFullDescription: String;
     // Diff
@@ -544,25 +587,44 @@ type
     function GetDiffTwoWay: String;
     function GetDiffTwoWayMoreInfo: String;
   public
-    constructor Create(const AEventType: TioEtmEventType; const AConflictType: TioEtmConflictType; const AEntityID: Integer; const AEntityClassName: String;
-      const AEntityObjVersion, ARevertedFromVersion: Integer; const AEntityState, ARemoteEntityState: String);
+    constructor Create(const AContextAsIInterface: IInterface); // IInterface to avoid circular reference
     property ID: Integer read FID;
     property DateAndTime: TioObjCreated read FDateAndTime;
-    property EventType: TioEtmEventType read FEventType;
+    // Entity related props
     property EntityClassName: String read FEntityClassName;
     property EntityID: Integer read FEntityID;
-    property EntityVersion: Integer read FEntityVersion;
-    property RevertedFromVersion: Integer read FRevertedFromVersion;
+    property EntityFromVersion: Integer read FEntityFromVersion;
+    property EntityToVersion: Integer read FEntityToVersion;
+    property EntityUpdated: TDateTime read FEntityUpdated;
     property EntityState: String read FEntityState;
-    property RemoteEntityState: String read FRemoteEntityState;
-    property ConflictType: TioEtmConflictType read FConflictType;
-    property UserName: TioObjCreatedUserName read FUserName;
+    // User related props
     property UserID: TioObjCreatedUserID read FUserID;
+    property UserName: TioObjCreatedUserName read FUserName;
+    // Persistence related props
+    property ActionType: TioPersistenceActionType read FActionType;
+    property IntentType: TioPersistenceIntentType read FIntentType;
+    property ConflictDetected: Boolean read FConflictDetected;
+    property ConflictState: TioPersistenceConflictState read FConflictState;
+    property ConflictStrategyName: String read FConflictStrategyName;
+    // BlindLevel props
+    property BlindLevel: Byte read FBlindLevel;
+    property BlindLevel_AutoUpdateProps: Boolean read GetBlindLevel_AutoUpdateProps;
+    property BlindLevel_DetectObjExists: Boolean read GetBlindLevel_DetectObjExists;
+    property BlindLevel_DetectConflicts: Boolean read GetBlindLevel_DetectConflicts;
+    // Conflict check by human related props
+    property ConflictCheckedByHuman: Boolean read FConflictCheckedByHuman write FConflictCheckedByHuman;
+    property ConflictCheckedByHuman_ID: Integer read FConflictCheckedByHuman_ID write FConflictCheckedByHuman_ID;
+    property ConflictCheckedByHuman_Name: String read FConflictCheckedByHuman_Name write FConflictCheckedByHuman_Name;
+    property ConflictCheckedByHuman_DateTime: TDateTime read FConflictCheckedByHuman_DateTime write FConflictCheckedByHuman_DateTime;
+    // Synchronization
+    property TimeSlotSynchroState: TioEtmTimeSlotSynchroState read FTimeSlotSynchroState;
     // Smart properties
     property SmartEntityInfo: String read GetSmartEntityInfo;
     property SmartEntityVersion: String read GetSmartEntityVersion;
     property SmartUser: String read GetSmartUser;
-    property SmartEventType: String read GetSmartEventType;
+    property SmartActionType: String read GetSmartActionType;
+    property SmartConflictInfo: String read GetSmartConflictInfo;
+    property SmartConflictCheckedByHuman: String read GetSmartConflictCheckedByHuman;
     property SmartDescription: String read GetSmartDescription;
     property SmartFullDescription: String read GetSmartFullDescription;
     // Diff methods
@@ -577,7 +639,7 @@ type
     property DiffTwoWayMoreInfo: String read GetDiffTwoWayMoreInfo;
     // ExtractCurrentEntityFunc anonymous method
     // NB: Questo è un anonymous method che viene passato dal BindSource che sta esponendo il TimeSlot stesso e che permette
-    //      di risalire alla versione corrente della entità attraverso la catena "ETMBindSource.etmFor.Current"
+    // di risalire alla versione corrente della entità attraverso la catena "ETMBindSource.etmFor.Current"
     property _ExtractCurrentEntityFunc: TFunc<TObject> read FExtractCurrentEntityFunc write FExtractCurrentEntityFunc;
   end;
 
@@ -594,6 +656,26 @@ type
     constructor Create(const ATimeSlotClass: TioEtmTimeSlotRef; const AConnectionName: String = '');
     property TimeSlotClass: TioEtmTimeSlotRef read FTimeSlotClass;
     property TraceOnlyOnConnectionName: String read FTraceOnlyOnConnectionName;
+  end;
+
+  etmPropertyAttribute = class(TCustomAttribute) // NB: Lasciarlo con "Attribute" alla fine del nome della classe così è più chiaro nelle eventuali exceptions
+  strict private
+    FEntityFinalPropName: String;
+    FEntityChildObjPath: TStrings;
+    FEtmFinalPropName: String;
+    FEtmChildObjPath: TStrings;
+    function GetEntityFinalPropName: String;
+    function GetEtmFinalPropName: String;
+  public
+    constructor Create(const AEntityPropName, AEtmPropName: String); overload;
+    constructor Create; overload;
+    destructor Destroy; override;
+    procedure SetMemberName(const AMemberName: String);
+    // properties
+    property EntityFinalPropName: String read GetEntityFinalPropName;
+    property EntityChildObjPath: TStrings read FEntityChildObjPath;
+    property EtmFinalPropName: String read GetEtmFinalPropName;
+    property EtmChildObjPath: TStrings read FEtmChildObjPath;
   end;
 
 {$ENDREGION} // END ETM ATTRIBUTES
@@ -613,7 +695,8 @@ type
 implementation
 
 uses
-  iORM, iORM.Utilities, iORM.Exceptions, iORM.Abstraction, iORM.ETM.Engine;
+  iORM, iORM.Utilities, iORM.Exceptions, iORM.Abstraction, iORM.ETM.Engine,
+  iORM.Context.Interfaces, DJSON, iORM.ETM.Factory;
 
 { TioStringAttribute }
 
@@ -692,21 +775,46 @@ end;
 
 constructor ioIndex.Create(const AIndexName: String; ACommaSepFieldList: String; const AIndexOrientation: TioIndexOrientation; const AUnique: Boolean);
 begin
-  inherited Create;
+  // Carlo Marona (2025-10-21): added check for empty index name
+  if AIndexName.IsEmpty then
+    raise EioGenericException.Create(ClassName, 'Create', 'No index name specified.');
+
+  Create(ACommaSepFieldList, AIndexOrientation, AUnique);
   FIndexName := AIndexName;
-  FCommaSepFieldList := ACommaSepFieldList;
-  FIndexOrientation := AIndexOrientation;
-  FUnique := AUnique;
+  FExplicitName := True;
+//  FCommaSepFieldList := ACommaSepFieldList;
+//  FIndexOrientation := AIndexOrientation;
+//  FUnique := AUnique;
 end;
 
 constructor ioIndex.Create(ACommaSepFieldList: String; const AIndexOrientation: TioIndexOrientation; const AUnique: Boolean);
 begin
-  Self.Create('', ACommaSepFieldList, AIndexOrientation, AUnique);
+  // Carlo Marona (2025-11-18): added check for empty fields list
+  if ACommaSepFieldList.IsEmpty then
+    raise EioGenericException.Create(ClassName, 'Create', 'No fields list specified.');
+
+  // Carlo Marona (2025-10-21)
+  Create(AIndexOrientation, AUnique);
+//  FIndexName := EmptyStr;
+  //FExplicitName := False;
+  FCommaSepFieldList := ACommaSepFieldList;
+//  FIndexOrientation := AIndexOrientation;
+//  FUnique := AUnique;
+
+//  Self.Create('', ACommaSepFieldList, AIndexOrientation, AUnique);
 end;
 
 constructor ioIndex.Create(const AIndexOrientation: TioIndexOrientation; const AUnique: Boolean);
 begin
-  Self.Create('', '', AIndexOrientation, AUnique);
+  // Carlo Marona (2025-10-21)
+  inherited Create;
+  FIndexName := EmptyStr;
+  FExplicitName := False;
+  FCommaSepFieldList := EmptyStr;
+  FIndexOrientation := AIndexOrientation;
+  FUnique := AUnique;
+
+//  Self.Create('', '', AIndexOrientation, AUnique);
 end;
 
 { ioInject }
@@ -918,18 +1026,63 @@ end;
 
 { TioEtmCustomTimeSlot }
 
-constructor TioEtmCustomTimeSlot.Create(const AEventType: TioEtmEventType; const AConflictType: TioEtmConflictType; const AEntityID: Integer;
-  const AEntityClassName: String; const AEntityObjVersion, ARevertedFromVersion: Integer; const AEntityState, ARemoteEntityState: String);
+constructor TioEtmCustomTimeSlot.Create(const AContextAsIInterface: IInterface);
+var
+  LContext: IioContext;
+  procedure _LoadCustomPropValues;
+  var
+    LEtmPropAttribute: etmPropertyAttribute;
+    LValue: TValue;
+  begin
+    for LEtmPropAttribute in LContext.GetTable.GetEtmPropToPropList(False) do
+    begin
+      LValue := TioUtilities.ResolveChildPropertySplitPath_GetValue(LContext.DataObject, LEtmPropAttribute.EntityChildObjPath,
+        LEtmPropAttribute.EntityFinalPropName);
+      TioUtilities.ResolveChildPropertySplitPath_SetValue(Self, LEtmPropAttribute.EtmChildObjPath, LEtmPropAttribute.EtmFinalPropName, LValue);
+    end;
+  end;
+
 begin
-  FEventType := AEventType;
-  FConflictType := AConflictType;
-  FEntityClassName := AEntityClassName;
-  FEntityID := AEntityID;
-  FEntityVersion := AEntityObjVersion;
-  FRevertedFromVersion := ARevertedFromVersion;
-  FEntityState := AEntityState;
-  FRemoteEntityState := ARemoteEntityState;
+  if not Supports(AContextAsIInterface, IioContext, LContext) then
+    raise EioGenericException.Create(ClassName, 'Create', 'The object received by the "AContextAsIInterface" parameter does not implements "IioContext" interface.');
+  // Se l'entità non ha un ID valido non è possibile che l'ETM funzioni
+  if LContext.IDIsNull then
+    raise EioETMException.Create(ClassName, 'Create',
+      Format('Hi, I''m iORM, we have a problem.' + #13#13'You asked me to persist an entity of type "%s" but this doesn''t have a valid ID.' +
+      #13#13'You probably set the "BlindLevel" so as not to set the object ID immediately after the insert operation but this is incompatible with using the ETM.'
+      + #13#13'Please try to set the BlindLevel to a correct value and try again, it will work.', [LContext.DataObject.ClassName]));
+  // Timeslot info
+  FDateAndTime := Now;
+  // Entity related props
+  FEntityClassName := LContext.DataObject.ClassName;
+  FEntityID := LContext.ObjID;
+  FEntityToVersion := Abs(LContext.ObjVersion);
+  FEntityFromVersion := LContext.EntityFromVersion;
+  FEntityUpdated := LContext.ObjUpdated;
+  FEntityState := dj.From(LContext.DataObject, TioEtmFactory.djParamsEngine).ToJson;
+  // User related props
+  FUserID := IO_INTEGER_NULL_VALUE;
+  FUserName := IO_STRING_NULL_VALUE;
+  // Persistence related props
+  FActionType := LContext.ActionType;
+  FIntentType := LContext.IntentType;
+  FBlindLevel := LContext.BlindLevel;
+  FConflictDetected := LContext.ConflictDetected;
+  FConflictState := LContext.ConflictState;
+  FConflictStrategyName := LContext.GetCurrentStrategyName;
+  // Conflict check by human related props
+  FConflictCheckedByHuman := False;
+  FConflictCheckedByHuman_ID := IO_INTEGER_NULL_VALUE;
+  FConflictCheckedByHuman_Name := IO_STRING_NULL_VALUE;
+  FConflictCheckedByHuman_DateTime := IO_DATETIME_NULL_VALUE;
+  // Synchronization
+  FTimeSlotSynchroState := LContext.SynchroStrategy_GetTimeSlotSynchroState;
+  // NB: Questo è un anonymous method che viene passato dal BindSource che sta esponendo il TimeSlot stesso e che permette
+  // di risalire alla versione corrente della entità attraverso la catena "ETMBindSource.etmFor.Current"
   FExtractCurrentEntityFunc := nil;
+  // Load custom property values (if exists)
+  if LContext.GetTable.EtmPropToPropListExists then
+    _LoadCustomPropValues;
 end;
 
 function TioEtmCustomTimeSlot.GetSmartEntityInfo: String;
@@ -939,19 +1092,74 @@ end;
 
 function TioEtmCustomTimeSlot.GetSmartEntityVersion: String;
 begin
-  if FRevertedFromVersion <> 0 then
-    Result := Format('%d (reverted from %d)', [FEntityVersion, RevertedFromVersion])
-  else
-    Result := FEntityVersion.ToString;
+  case FActionType of
+    atInsert, atUpdate:
+      if FEntityFromVersion > 0 then
+        Result := Format('%d (from %d)', [FEntityToVersion, FEntityFromVersion])
+      else
+        Result := FEntityToVersion.ToString;
+    atDelete:
+      Result := FEntityToVersion.ToString;
+  end;
+// ===== OLD CODE =====
+//  case FIntentType of
+//    itRegular:
+//      if FActionType = atUpdate then
+//        Result := Format('%d (updated from %d)', [FEntityToVersion, FEntityFromVersion])
+//      else
+//        Result := FEntityToVersion.ToString;
+//    itRevert:
+//      Result := Format('%d (reverted from %d)', [FEntityToVersion, FEntityFromVersion]);
+//    itSynchro_PersistToServer, itSynchro_PersistToClient:
+//      Result := Format('%d (synchronized from %d)', [FEntityToVersion, FEntityFromVersion]);
+//  else
+//    raise EioGenericException.Create(ClassName, 'GetSmartEntityVersion', 'IntentType not valid.');
+//  end;
+// ===== OLD CODE =====
 end;
 
-function TioEtmCustomTimeSlot.GetSmartEventType: String;
+function TioEtmCustomTimeSlot.GetSmartActionType: String;
 begin
-  // Event type
-  Result := io.Enums.OrdinalToString<TioEtmEventType>(Ord(FEventType));
-  // Conflict type
-  if FConflictType > ctNoConflict then
-    Result := Format('%s (%s)', [Result, io.Enums.OrdinalToString<TioEtmConflictType>(Ord(FConflictType))]);
+  // Action type
+  Result := io.Enums.OrdinalToString<TioPersistenceActionType>(Ord(FActionType));
+  // Intent type
+  case FIntentType of
+    itRevert:
+      Result := Result + ' (revert)';
+    itSynchro_PersistToServer, itSynchro_PersistToClient:
+      Result := Result + ' (synchronization)';
+  end;
+end;
+
+function TioEtmCustomTimeSlot.GetSmartConflictInfo: String;
+begin
+  if FConflictDetected then
+    Result := Format('%s (%s)', [io.Enums.OrdinalToString<TioPersistenceConflictState>(Ord(FConflictState)), FConflictStrategyName])
+  else
+    Result := String.Empty;
+end;
+
+function TioEtmCustomTimeSlot.GetSmartConflictCheckedByHuman: String;
+begin
+  // If not checked by human then return an empty string
+  if not FConflictCheckedByHuman then
+    Exit(String.Empty);
+  // If human checked build the result string
+  Result := 'Checked';
+  // human name & human ID
+  if not FConflictCheckedByHuman_Name.IsEmpty then
+  begin
+    Result := Result + ' by ' + FConflictCheckedByHuman_Name;
+    if FConflictCheckedByHuman_ID <> IO_INTEGER_NULL_VALUE then
+      Result := Result + ' (id ' + FConflictCheckedByHuman_ID.ToString + ')';
+  end
+  else
+    // human id only
+    if FConflictCheckedByHuman_ID <> IO_INTEGER_NULL_VALUE then
+      Result := Result + ' by id ' + FConflictCheckedByHuman_ID.ToString;
+  // date time
+  if FConflictCheckedByHuman_DateTime <> IO_DATETIME_NULL_VALUE then
+    Result := Result + ' on ' + DateTimeToStr(FConflictCheckedByHuman_DateTime, TFormatSettings.Create);
 end;
 
 function TioEtmCustomTimeSlot.Diff(const ADiffMode: TioEtmDiffMode; const AMoreInfo: Boolean): String;
@@ -977,6 +1185,21 @@ procedure TioEtmCustomTimeSlot.DiffToStream(const ATargetStream: TStream; const 
 begin
   if Assigned(FExtractCurrentEntityFunc) then
     TioEtmEngine.DiffToStream(ATargetStream, FExtractCurrentEntityFunc, Self, ADiffMode, AMoreInfo);
+end;
+
+function TioEtmCustomTimeSlot.GetBlindLevel_AutoUpdateProps: Boolean;
+begin
+  Result := (FBlindLevel AND BL_BIT_AUTO_UPDATE_PROPS) <> 0;
+end;
+
+function TioEtmCustomTimeSlot.GetBlindLevel_DetectConflicts: Boolean;
+begin
+  Result := (FBlindLevel AND BL_BIT_DETECT_CONFLICTS) <> 0;
+end;
+
+function TioEtmCustomTimeSlot.GetBlindLevel_DetectObjExists: Boolean;
+begin
+  Result := (FBlindLevel AND BL_BIT_DETECT_OBJ_EXISTS) <> 0;
 end;
 
 function TioEtmCustomTimeSlot.GetDiffOneWay: String;
@@ -1005,9 +1228,10 @@ var
   LDateAndTime: String;
   LSmartUser: String;
 begin
+  // Es: '31/12/2023 10:15:35 Update (revert) user Maurizio'
   LFormatSettings := TFormatSettings.Create;
   LDateAndTime := DateTimeToStr(FDateAndTime, LFormatSettings);
-  Result := Format('%s %s', [LDateAndTime, GetSmartEventType]);
+  Result := Format('%s %s', [LDateAndTime, GetSmartActionType]);
   // User
   LSmartUser := GetSmartUser;
   if not LSmartUser.IsEmpty then
@@ -1016,6 +1240,7 @@ end;
 
 function TioEtmCustomTimeSlot.GetSmartFullDescription: String;
 begin
+  // Es: '31/12/2023 10:15:35 Update (revert) user Maurizio ver. 5 (updated from 4)'
   Result := Format('%s ver. %s', [GetSmartDescription, GetSmartEntityVersion]);
 end;
 
@@ -1038,6 +1263,60 @@ begin
       Result := Result + '-';
     Result := LUserName + Result;
   end;
+end;
+
+{ ioConflictStrategy }
+
+{ etmProperty }
+
+constructor etmPropertyAttribute.Create;
+begin
+  // Init
+  FEntityFinalPropName := String.Empty;
+  FEntityChildObjPath := nil;
+  FEtmFinalPropName := String.Empty;
+  FEtmChildObjPath := nil;
+end;
+
+destructor etmPropertyAttribute.Destroy;
+begin
+  if Assigned(FEntityChildObjPath) then
+    FEntityChildObjPath.Free;
+  if Assigned(FEtmChildObjPath) then
+    FEtmChildObjPath.Free;
+  inherited;
+end;
+
+function etmPropertyAttribute.GetEntityFinalPropName: String;
+begin
+  if not FEntityFinalPropName.Trim.IsEmpty then
+    Result := FEntityFinalPropName
+  else
+    raise EioGenericException.Create(ClassName, 'GetEntityFinalPropName', '"EntityFinalPropName" property cannot be empty.');
+end;
+
+function etmPropertyAttribute.GetEtmFinalPropName: String;
+begin
+  if not FEtmFinalPropName.Trim.IsEmpty then
+    Result := FEtmFinalPropName
+  else
+    raise EioGenericException.Create(ClassName, 'GetEtmFinalPropName', '"EtmFinalPropName" property cannot be empty.');
+end;
+
+constructor etmPropertyAttribute.Create(const AEntityPropName, AEtmPropName: String);
+begin
+  TioUtilities.ResolveChildPropertyPath_SplitPropNameAndPath(AEntityPropName, FEntityChildObjPath, FEntityFinalPropName);
+  TioUtilities.ResolveChildPropertyPath_SplitPropNameAndPath(AEtmPropName, FEtmChildObjPath, FEtmFinalPropName);
+end;
+
+procedure etmPropertyAttribute.SetMemberName(const AMemberName: String);
+begin
+  // If the FEntityFinalPropName is empty then set it to AMemberName param value
+  if FEntityFinalPropName.IsEmpty then
+    FEntityFinalPropName := AMemberName;
+  // If the FEtmFinalPropName is empty then set it to AMemberName param value
+  if FEtmFinalPropName.IsEmpty then
+    FEtmFinalPropName := AMemberName;
 end;
 
 end.

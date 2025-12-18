@@ -51,7 +51,8 @@ type
   TioActiveInterfaceListBindSourceAdapter = class(TInterfaceListBindSourceAdapter, IioContainedBindSourceAdapter, IioActiveBindSourceAdapter,
     IioNaturalBindSourceAdapterSource)
   private
-    FAsync: Boolean;
+    FAsyncLoad: Boolean;
+    FAsyncPersist: Boolean;
     FWhere: IioWhere;
     FWhereDetailsFromDetailAdapters: Boolean;
     FTypeName, FTypeAlias: String;
@@ -69,19 +70,23 @@ type
     FDataSetLinkContainer: IioBSAToDataSetLinkContainer;
     FBSPersistenceDeleting: Boolean;
     // Reference to the same instance contained by FList field, this reference is only to keep live the list instance
+    // TODO: Dopo aver eliminato le IioList<T> interne è da eliminare? Opppure la teniamo e ripristiniamo anche i costruttori per le liste di Spring4D
     FInterfacedList: IInterface;
-    // Async property
-    function GetIoAsync: Boolean;
-    procedure SetIoAsync(const Value: Boolean);
+    // AsyncLoad property
+    function GetAsyncLoad: Boolean;
+    procedure SetAsyncLoad(const Value: Boolean);
+    // AsyncPersist property
+    function GetAsyncPersist: Boolean;
+    procedure SetAsyncPersist(const Value: Boolean);
     // AutoPost property
     procedure SetioAutoPost(const Value: Boolean);
     function GetioAutoPost: Boolean;
     // WhereStr property
-    procedure SetIoWhere(const Value: IioWhere);
-    function GetioWhere: IioWhere;
+    procedure SetWhere(const Value: IioWhere);
+    function GetWhere: IioWhere;
     // ioWhereDetailsFromDetailAdapters property
-    function GetioWhereDetailsFromDetailAdapters: Boolean;
-    procedure SetioWhereDetailsFromDetailAdapters(const Value: Boolean);
+    function GetWhereDetailsFromDetailAdapters: Boolean;
+    procedure SetWhereDetailsFromDetailAdapters(const Value: Boolean);
     // ioViewDataType
     function GetTypeOfCollection: TioTypeOfCollection;
     // ioOwnsObjects
@@ -150,8 +155,8 @@ type
   public
     constructor Create(const ATypeName, ATypeAlias: String; const AWhere: IioWhere; const AOwner: TComponent; const ADataObject: TObject;
       const AOwnsObject: Boolean = True); overload;
-    constructor Create(const ATypeName, ATypeAlias: String; const AWhere: IioWhere; const AOwner: TComponent; const ADataObject: IInterface;
-      const AOwnsObject: Boolean = False); overload;
+//    constructor Create(const ATypeName, ATypeAlias: String; const AWhere: IioWhere; const AOwner: TComponent; const ADataObject: IInterface;
+//      const AOwnsObject: Boolean = False); overload;
     destructor Destroy; override;
     function MasterAdaptersContainer: IioDetailBindSourceAdaptersContainer;
     procedure SetMasterAdaptersContainer(AMasterAdaptersContainer: IioDetailBindSourceAdaptersContainer);
@@ -198,7 +203,7 @@ implementation
 
 uses
   iORM, iORM.LiveBindings.Factory, iORM.Context.Factory, iORM.Context.Interfaces, System.SysUtils, iORM.LazyLoad.Interfaces, iORM.Exceptions,
-  iORM.Context.Map.Interfaces, iORM.Where.Factory, iORM.LiveBindings.CommonBSAPersistence, iORM.Abstraction, iORM.Containers.Interfaces,
+  iORM.Context.Map.Interfaces, iORM.Where.Factory, iORM.LiveBindings.CommonBSAPersistence, iORM.Abstraction,
   iORM.LiveBindings.CommonBSABehavior, iORM.Context.Container;
 
 { TioActiveListBindSourceAdapter<T> }
@@ -216,6 +221,47 @@ begin
 end;
 {$ENDIF}
 
+constructor TioActiveInterfaceListBindSourceAdapter.InternalCreate(const ATypeName, ATypeAlias: String; const AWhere: IioWhere; const AOwner: TComponent;
+  const AOwnsObject: Boolean = True);
+begin
+  FInterfacedList := nil;
+  FLoadType := ltAuto;
+  FLazy := False;
+  FLazyProps := '';
+  FAsyncLoad := False;
+  FAsyncPersist := False;
+  FReloading := False;
+  FBSPersistenceDeleting := False;
+  // inherited Create(AOwner, ADataObject, ATypeAlias, ATypeName, AOwnsObject);
+  FLocalOwnsObject := AOwnsObject;
+  FWhere := AWhere;
+  FWhereDetailsFromDetailAdapters := False;
+  FTypeName := ATypeName;
+  FTypeAlias := ATypeAlias;
+  FDataSetLinkContainer := TioLiveBindingsFactory.BSAToDataSetLinkContainer;
+  // Set Master & Details adapters reference
+  FMasterAdaptersContainer := nil;
+  FDetailAdaptersContainer := TioLiveBindingsFactory.DetailAdaptersContainer(Self);
+  // Init InsertObj subsystem values
+  FInsertObj_Enabled := False;
+  FInsertObj_NewObj := nil;
+end;
+
+constructor TioActiveInterfaceListBindSourceAdapter.Create(const ATypeName, ATypeAlias: String; const AWhere: IioWhere; const AOwner: TComponent;
+  const ADataObject: TObject; const AOwnsObject: Boolean);
+begin
+  inherited Create(AOwner, ADataObject, ATypeAlias, ATypeName, AOwnsObject);
+  InternalCreate(ATypeName, ATypeAlias, AWhere, AOwner, AOwnsObject);
+end;
+
+//constructor TioActiveInterfaceListBindSourceAdapter.Create(const ATypeName, ATypeAlias: String; const AWhere: IioWhere; const AOwner: TComponent;
+//  const ADataObject: IInterface; const AOwnsObject: Boolean);
+//begin
+//  inherited Create(AOwner, ADataObject, ATypeAlias, ATypeName, AOwnsObject);
+//  InternalCreate(ATypeName, ATypeAlias, AWhere, AOwner, AOwnsObject);
+//  FInterfacedList := ADataObject;
+//end;
+
 procedure TioActiveInterfaceListBindSourceAdapter.Append(AObject: IInterface);
 begin
   // Set sone InsertObj subsystem variables
@@ -227,7 +273,7 @@ end;
 
 procedure TioActiveInterfaceListBindSourceAdapter.Append(AObject: TObject);
 begin
-  raise EioException.Create(Self.ClassName, 'Append', 'This ActiveBindSourceAdapter is for interface referenced instances only.');
+  raise EioGenericException.Create(Self.ClassName, 'Append', 'This ActiveBindSourceAdapter is for interface referenced instances only.');
 end;
 
 function TioActiveInterfaceListBindSourceAdapter.AsActiveBindSourceAdapter: IioActiveBindSourceAdapter;
@@ -243,21 +289,6 @@ end;
 procedure TioActiveInterfaceListBindSourceAdapter.ClearDataObject;
 begin
   Self.InternalSetDataObject(nil, False);
-end;
-
-constructor TioActiveInterfaceListBindSourceAdapter.Create(const ATypeName, ATypeAlias: String; const AWhere: IioWhere; const AOwner: TComponent;
-  const ADataObject: IInterface; const AOwnsObject: Boolean);
-begin
-  inherited Create(AOwner, ADataObject, ATypeAlias, ATypeName, AOwnsObject);
-  InternalCreate(ATypeName, ATypeAlias, AWhere, AOwner, AOwnsObject);
-  FInterfacedList := ADataObject;
-end;
-
-constructor TioActiveInterfaceListBindSourceAdapter.Create(const ATypeName, ATypeAlias: String; const AWhere: IioWhere; const AOwner: TComponent;
-  const ADataObject: TObject; const AOwnsObject: Boolean);
-begin
-  inherited Create(AOwner, ADataObject, ATypeAlias, ATypeName, AOwnsObject);
-  InternalCreate(ATypeName, ATypeAlias, AWhere, AOwner, AOwnsObject);
 end;
 
 procedure TioActiveInterfaceListBindSourceAdapter.DeleteListViewItem(const AItemIndex, ADelayMilliseconds: Integer);
@@ -496,9 +527,14 @@ begin
   Result := Self.Fields;
 end;
 
-function TioActiveInterfaceListBindSourceAdapter.GetIoAsync: Boolean;
+function TioActiveInterfaceListBindSourceAdapter.GetAsyncLoad: Boolean;
 begin
-  Result := FAsync;
+  Result := FAsyncLoad;
+end;
+
+function TioActiveInterfaceListBindSourceAdapter.GetAsyncPersist: Boolean;
+begin
+  Result := FAsyncPersist;
 end;
 
 function TioActiveInterfaceListBindSourceAdapter.NewDetailBindSourceAdapter(const AOwner: TComponent; const AMasterPropertyName: String; const AWhere: IioWhere)
@@ -519,7 +555,7 @@ begin
   Result := TYPE_OF_COLLECTION;
 end;
 
-function TioActiveInterfaceListBindSourceAdapter.GetioWhere: IioWhere;
+function TioActiveInterfaceListBindSourceAdapter.GetWhere: IioWhere;
 begin
   Result := FWhere;
   // Fill the WhereDetails from the DetailAdapters container if enabled
@@ -532,7 +568,7 @@ begin
   end;
 end;
 
-function TioActiveInterfaceListBindSourceAdapter.GetioWhereDetailsFromDetailAdapters: Boolean;
+function TioActiveInterfaceListBindSourceAdapter.GetWhereDetailsFromDetailAdapters: Boolean;
 begin
   Result := FWhereDetailsFromDetailAdapters;
 end;
@@ -604,34 +640,9 @@ begin
   Self.Insert;
 end;
 
-constructor TioActiveInterfaceListBindSourceAdapter.InternalCreate(const ATypeName, ATypeAlias: String; const AWhere: IioWhere; const AOwner: TComponent;
-  const AOwnsObject: Boolean = True);
-begin
-  FInterfacedList := nil;
-  FLoadType := ltAuto;
-  FLazy := False;
-  FLazyProps := '';
-  FAsync := False;
-  FReloading := False;
-  FBSPersistenceDeleting := False;
-  // inherited Create(AOwner, ADataObject, ATypeAlias, ATypeName, AOwnsObject);
-  FLocalOwnsObject := AOwnsObject;
-  FWhere := AWhere;
-  FWhereDetailsFromDetailAdapters := False;
-  FTypeName := ATypeName;
-  FTypeAlias := ATypeAlias;
-  FDataSetLinkContainer := TioLiveBindingsFactory.BSAToDataSetLinkContainer;
-  // Set Master & Details adapters reference
-  FMasterAdaptersContainer := nil;
-  FDetailAdaptersContainer := TioLiveBindingsFactory.DetailAdaptersContainer(Self);
-  // Init InsertObj subsystem values
-  FInsertObj_Enabled := False;
-  FInsertObj_NewObj := nil;
-end;
-
 procedure TioActiveInterfaceListBindSourceAdapter.Insert(AObject: TObject);
 begin
-  raise EioException.Create(Self.ClassName, 'Append', 'This ActiveBindSourceAdapter is for interface referenced instances only.');
+  raise EioGenericException.Create(Self.ClassName, 'Append', 'This ActiveBindSourceAdapter is for interface referenced instances only.');
 end;
 
 function TioActiveInterfaceListBindSourceAdapter.HasBindSource: Boolean;
@@ -698,7 +709,7 @@ begin
   if Supports(ASelected, IInterface, LSelectedAsIntf) then
     ReceiveSelection(LSelectedAsIntf, ASelectionType)
   else
-    raise EioException.Create(Self.ClassName, 'ReceiveSelection', 'Selected instance does not support any interface.');
+    raise EioGenericException.Create(Self.ClassName, 'ReceiveSelection', 'Selected instance does not support any interface.');
 end;
 
 procedure TioActiveInterfaceListBindSourceAdapter.ReceiveSelection(ASelected: IInterface; ASelectionType: TioSelectionType);
@@ -835,9 +846,14 @@ begin
   Self._InternalSetDataObject<TObject>(ADataObject, AOwnsObject);
 end;
 
-procedure TioActiveInterfaceListBindSourceAdapter.SetIoAsync(const Value: Boolean);
+procedure TioActiveInterfaceListBindSourceAdapter.SetAsyncLoad(const Value: Boolean);
 begin
-  FAsync := Value;
+  FAsyncLoad := Value;
+end;
+
+procedure TioActiveInterfaceListBindSourceAdapter.SetAsyncPersist(const Value: Boolean);
+begin
+  FAsyncPersist := Value;
 end;
 
 procedure TioActiveInterfaceListBindSourceAdapter.SetioAutoPost(const Value: Boolean);
@@ -845,12 +861,12 @@ begin
   Self.AutoPost := Value;
 end;
 
-procedure TioActiveInterfaceListBindSourceAdapter.SetIoWhere(const Value: IioWhere);
+procedure TioActiveInterfaceListBindSourceAdapter.SetWhere(const Value: IioWhere);
 begin
   FWhere := Value;
 end;
 
-procedure TioActiveInterfaceListBindSourceAdapter.SetioWhereDetailsFromDetailAdapters(const Value: Boolean);
+procedure TioActiveInterfaceListBindSourceAdapter.SetWhereDetailsFromDetailAdapters(const Value: Boolean);
 begin
   FWhereDetailsFromDetailAdapters := Value;
 end;
@@ -867,7 +883,7 @@ begin
   if Supports(Value, IInterface, LIntf) then
     Self.List.Items[AIndex] := LIntf
   else
-    raise EioException.Create(Self.ClassName, 'SetItems', 'Value object does not implement any interface.');
+    raise EioGenericException.Create(Self.ClassName, 'SetItems', 'Value object does not implement any interface.');
 end;
 
 procedure TioActiveInterfaceListBindSourceAdapter.SetMasterAdaptersContainer(AMasterAdaptersContainer: IioDetailBindSourceAdaptersContainer);

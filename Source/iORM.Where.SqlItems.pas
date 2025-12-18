@@ -107,6 +107,17 @@ type
     function HasParameter: Boolean; override;
   end;
 
+  // Specialized SqlItemWhere for property equals to for param (best for internal use)
+  TioSqlItemsWherePropertyIn = class(TioSqlItemsWhere)
+  strict private
+    FValue: TValue;
+  public
+    constructor Create(const ASqlText: String); reintroduce; overload; // raise exception
+    constructor Create(const ASqlText: String; const AValue: TValue); reintroduce; overload;
+    function GetSql(const AMap: IioMap): String; override;
+    function HasParameter: Boolean; override;
+  end;
+
   // Specialized SqlItemWhere for propertyID equals to for param (best for internal use)
   TioSqlItemsWherePropertyIDEqualsTo = class(TioSqlItemsWhere)
   strict private
@@ -143,6 +154,7 @@ type
 implementation
 
 uses
+  Classes,
   iORM.Exceptions, iORM.DB.Factory, iORM.SqlTranslator,
   iORM.Context.Properties.Interfaces, System.SysUtils, System.Types,
   iORM.Context.Container, System.StrUtils, iORM.Utilities, iORM.Where.Factory;
@@ -156,7 +168,7 @@ end;
 
 constructor TioSqlItemsWhereTValue.Create(const ASqlText: String);
 begin
-  raise EioException.Create('TioSqlItemsWhereValue wrong constructor called');
+  raise EioGenericException.Create('TioSqlItemsWhereValue wrong constructor called');
 end;
 
 function TioSqlItemsWhereTValue.GetSql(const AMap: IioMap): String;
@@ -217,7 +229,7 @@ end;
 
 constructor TioSqlItemsWherePropertyEqualsTo.Create(const ASqlText: String);
 begin
-  raise EioException.Create(Self.ClassName + ': wrong constructor called');
+  raise EioGenericException.Create(Self.ClassName + ': wrong constructor called');
 end;
 
 constructor TioSqlItemsWherePropertyEqualsTo.Create(const ASqlText: String; const AValue: TValue);
@@ -254,7 +266,7 @@ end;
 
 constructor TioSqlItemsWherePropertyIDEqualsTo.Create(const ASqlText: String);
 begin
-  raise EioException.Create(Self.ClassName + ': wrong constructor called');
+  raise EioGenericException.Create(Self.ClassName + ': wrong constructor called');
 end;
 
 constructor TioSqlItemsWherePropertyIDEqualsTo.Create(const AValue: TValue);
@@ -310,7 +322,7 @@ end;
 
 constructor TioSqlItemsCriteria.Create(const ASqlText: String);
 begin
-  raise EioException.Create(Self.ClassName + ': wrong constructor called');
+  raise EioGenericException.Create(Self.ClassName + ': wrong constructor called');
 end;
 
 constructor TioSqlItemsCriteria.Create(const APropertyName: String; const ACompareOperator: TioCompareOp; AValue: TValue);
@@ -322,9 +334,9 @@ begin
   // Value
   case AValue.Kind of
     tkClass:
-      AValue := TValue.From<Integer>(TioUtilities.ExtractOID(AValue.AsObject));
+      AValue := TValue.From<Integer>(TioUtilities.ObjToID(AValue.AsObject));
     tkInterface:
-      AValue := TValue.From<Integer>(TioUtilities.ExtractOID(AValue.AsInterface));
+      AValue := TValue.From<Integer>(TioUtilities.IntfToID(AValue.AsInterface));
   end;
   FValueSqlItem := TioDBFactory.WhereItemTValue(AValue);
 end;
@@ -362,6 +374,61 @@ end;
 function TioSqlItemsCriteria.IsNestedPropName(const APropName: String): Boolean;
 begin
   Result := APropName.Contains('.');
+end;
+
+{ TioSqlItemsWherePropertyIn }
+
+constructor TioSqlItemsWherePropertyIn.Create(const ASqlText: String);
+begin
+  raise EioGenericException.Create(Self.ClassName + ': wrong constructor called');
+end;
+
+constructor TioSqlItemsWherePropertyIn.Create(const ASqlText: String; const AValue: TValue);
+begin
+  if not AValue.IsArray then
+    raise Exception.Create('AValue not is an array');
+
+  inherited Create(ASqlText);
+  FValue := AValue;
+end;
+
+function TioSqlItemsWherePropertyIn.GetSql(const AMap: IioMap): String;
+var
+  AProp: IioProperty;
+  LValue: string;
+  LItemCount: Integer;
+  LElement: TValue;
+  LStrings: TStringList;
+  I: integer;
+begin
+  LStrings := TStringList.Create;
+
+  try
+    LItemCount := FValue.GetArrayLength;
+
+    for I := 0 to Pred(LItemCount) do
+    begin
+      LElement := FValue.GetArrayElement(I);
+
+      if LElement.IsType<String> then
+        LStrings.Add(LElement.ToString.QuotedString(''''))
+      else
+        LStrings.Add(LElement.ToString);
+    end;
+
+    LValue := LStrings.CommaText;
+  finally
+    LStrings.Free;
+  end;
+
+  // NB: No inherited
+  AProp := AMap.GetProperties.GetPropertyByName(FSqlText);
+  Result := AProp.GetSqlQualifiedFieldName + TioDBFactory.CompareOperator._In.GetSql + '(' + LValue + ')';
+end;
+
+function TioSqlItemsWherePropertyIn.HasParameter: Boolean;
+begin
+  Result := False;
 end;
 
 end.

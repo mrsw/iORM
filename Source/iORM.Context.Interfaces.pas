@@ -38,7 +38,8 @@ interface
 uses
   iORM.CommonTypes, iORM.Context.Table.Interfaces,
   iORM.Context.Properties.Interfaces, System.Rtti, iORM.Where.Interfaces,
-  iORM.Context.Map.Interfaces, iORM.LiveBindings.BSPersistence;
+  iORM.Context.Map.Interfaces, iORM.LiveBindings.BSPersistence,
+  iORM.Attributes;
 
 type
 
@@ -46,30 +47,57 @@ type
   IioContext = interface
     ['{6B512CDA-23C6-42A3-AC44-905344B019E9}']
     function GetClassRef: TioClassRef;
-    function GetTable: IioTable;
     function GetProperties: IioProperties;
+    function GetTable: IioTable;
     function GetTrueClass: IioTrueClass;
+    function IDIsNull: Boolean;
     function IsTrueClass: Boolean;
     function RttiContext: TRttiContext;
     function RttiType: TRttiInstanceType;
     function WhereExist: Boolean;
-    function GetID: Integer;
-    function IDIsNull: Boolean;
+    // Conflict strategy methods (to avoid circular reference)
+    procedure CheckDeleteConflict;
+    procedure CheckInsertConflict;
+    procedure CheckUpdateConflict;
+    procedure ResolveDeleteConflict;
+    procedure ResolveInsertConflict;
+    procedure ResolveUpdateConflict;
+    function GetCurrentStrategyName: String;
+    // Synchronization Strategy methods
+    function SynchroStrategy_CanPersistEtmTimeSlot: Boolean;
+    procedure SynchroStrategy_GenerateLocalID;
+    function SynchroStrategy_GetTimeSlotSynchroState: TioEtmTimeSlotSynchroState;
+    // BlindLevel helper methods
+    function BlindLevel_Do_DetectObjExists: boolean;
+    function BlindLevel_Do_AutoUpdateProps: boolean;
+    function BlindLevel_Do_DetectConflicts: boolean;
+    procedure BlindLevel_Set_DetectObjExists;
+    procedure BlindLevel_Set_AutoUpdateProps;
+    procedure BlindLevel_Set_DetectConflicts;
+    procedure BlindLevel_Reset_DetectObjExists;
+    procedure BlindLevel_Reset_AutoUpdateProps;
+    procedure BlindLevel_Reset_DetectConflicts;
     // Map
     function Map: IioMap;
     // DataObject
     procedure SetDataObject(const AValue: TObject);
     function GetDataObject: TObject;
     property DataObject:TObject read GetDataObject write SetDataObject;
+    // ObjID
+    function GetObjID: Integer;
+    procedure SetObjID(const AValue: Integer);
+    property ObjID: Integer read GetObjID write SetObjID;
     // ObjectStatus
     procedure SetObjStatus(const AValue: TioObjStatus);
     function GetObjStatus: TioObjStatus;
     property ObjStatus:TioObjStatus read GetObjStatus write SetObjStatus;
     // ObjVersion
-    function NextObjVersion(const ASetValue: Boolean): TioObjVersion;
     function GetObjVersion: TioObjVersion;
     procedure SetObjVersion(const AValue: TioObjVersion);
     property ObjVersion:TioObjVersion read GetObjVersion write SetObjVersion; // write SetObjVersion;
+    // ObjNextVersion
+    function GetObjNextVersion: Integer; // Con tipo TioObjVersion ci sono problemi
+    property ObjNextVersion: Integer read GetObjNextVersion; // Con tipo TioObjVersion ci sono problemi
     // ObjCreated
     function GetObjCreated: TioObjCreated;
     procedure SetObjCreated(const AValue: TioObjCreated);
@@ -116,10 +144,30 @@ type
     procedure SetOriginalNonTrueClassMap(const AMap: IioMap);
     function GetOriginalNonTrueClassMap: IioMap;
     property OriginalNonTrueClassMap: IioMap read GetOriginalNonTrueClassMap write SetOriginalNonTrueClassMap;
-    // EtmRevertedFromVersion
-    function GetEtmRevertedFromVersion: Integer;
-    procedure SetEtmRevertedFromVersion(const Value: Integer);
-    property EtmRevertedFromVersion: Integer read GetEtmRevertedFromVersion write SetEtmRevertedFromVersion;
+    // EntityFromVersion
+    function GetEntityFromVersion: Integer;
+    procedure SetEntityFromVersion(const Value: Integer);
+    property EntityFromVersion: Integer read GetEntityFromVersion write SetEntityFromVersion;
+    // ActionType
+    function GetActionType: TioPersistenceActionType;
+    procedure SetActionType(const Value: TioPersistenceActionType);
+    property ActionType: TioPersistenceActionType read GetActionType write SetActionType;
+    // IntentType
+    function GetIntentType: TioPersistenceIntentType;
+    procedure SetIntentType(const Value: TioPersistenceIntentType);
+    property IntentType: TioPersistenceIntentType read GetIntentType write SetIntentType;
+    // BlindLevel
+    function GetBlindLevel: Byte;
+    procedure SetBlindLevel(const Value: Byte);
+    property BlindLevel: Byte read GetBlindLevel write SetBlindLevel;
+    // ConflictDetected
+    function GetConflictDetected: Boolean;
+    procedure SetConflictDetected(const Value: Boolean);
+    property ConflictDetected: Boolean read GetConflictDetected write SetConflictDetected;
+    // ConflictState
+    function GetConflictState: TioPersistenceConflictState;
+    procedure SetConflictState(const Value: TioPersistenceConflictState);
+    property ConflictState: TioPersistenceConflictState read GetConflictState write SetConflictState;
   end;
 
 implementation

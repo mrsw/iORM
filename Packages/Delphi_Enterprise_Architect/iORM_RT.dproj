@@ -3,7 +3,7 @@
         <ProjectGuid>{EDA76E4A-4BD0-4BDC-A9E0-03FA00D3B650}</ProjectGuid>
         <MainSource>iORM_RT.dpk</MainSource>
         <ProjectVersion>19.5</ProjectVersion>
-        <FrameworkType>None</FrameworkType>
+        <FrameworkType>FMX</FrameworkType>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
@@ -258,10 +258,6 @@
         <DCCReference Include="..\..\Source\iORM.DB.QueryContainer.pas"/>
         <DCCReference Include="..\..\Source\iORM.DB.QueryEngine.pas"/>
         <DCCReference Include="..\..\Source\iORM.Where.SqlItems.Interfaces.pas"/>
-        <DCCReference Include="..\..\Source\iORM.Containers.Interfaces.pas"/>
-        <DCCReference Include="..\..\Source\iORM.Containers.List.pas"/>
-        <DCCReference Include="..\..\Source\iORM.Containers.Factory.pas"/>
-        <DCCReference Include="..\..\Source\iORM.Containers.ObjectList.pas"/>
         <DCCReference Include="..\..\Source\iORM.Resolver.Interfaces.pas"/>
         <DCCReference Include="..\..\Source\iORM.Utilities.pas"/>
         <DCCReference Include="..\..\Source\iORM.Resolver.Factory.pas"/>
@@ -285,10 +281,10 @@
         <DCCReference Include="..\..\Source\iORM.MVVM.VMActionContainer.pas"/>
         <DCCReference Include="..\..\Source\iORM.LazyLoad.LazyLoadObject.pas"/>
         <DCCReference Include="..\..\Source\iORM.Http.Connection.pas"/>
-        <DCCReference Include="..\..\Source\iORM.Strategy.DB.pas"/>
-        <DCCReference Include="..\..\Source\iORM.Strategy.Interfaces.pas"/>
-        <DCCReference Include="..\..\Source\iORM.Strategy.Factory.pas"/>
-        <DCCReference Include="..\..\Source\iORM.Strategy.Http.pas"/>
+        <DCCReference Include="..\..\Source\iORM.PersistenceStrategy.DB.pas"/>
+        <DCCReference Include="..\..\Source\iORM.PersistenceStrategy.Interfaces.pas"/>
+        <DCCReference Include="..\..\Source\iORM.PersistenceStrategy.Factory.pas"/>
+        <DCCReference Include="..\..\Source\iORM.PersistenceStrategy.Http.pas"/>
         <DCCReference Include="..\..\Source\iORM.Http.Body.Request.pas"/>
         <DCCReference Include="..\..\Source\iORM.Http.Interfaces.pas"/>
         <DCCReference Include="..\..\Source\iORM.Http.Body.Response.pas"/>
@@ -388,6 +384,15 @@
         <DCCReference Include="..\..\Source\iORM.ETM.Factory.pas"/>
         <DCCReference Include="..\..\Source\iORM.ETM.Diff.Twoway.pas"/>
         <DCCReference Include="..\..\Source\iORM.StdActions.CommonBehaviour.pas"/>
+        <DCCReference Include="..\..\Source\iORM.ConflictStrategy.Interfaces.pas"/>
+        <DCCReference Include="..\..\Source\iORM.ConflictStrategy.SameVersionWin.pas"/>
+        <DCCReference Include="..\..\Source\iORM.ConflictStrategy.LastUpdateWin.pas"/>
+        <DCCReference Include="..\..\Source\iORM.Resolver.ResolvedTypeList.pas"/>
+        <DCCReference Include="..\..\Source\iORM.SynchroStrategy.Interfaces.pas"/>
+        <DCCReference Include="..\..\Source\iORM.SynchroStrategy.EtmBased.pas"/>
+        <DCCReference Include="..\..\Source\iORM.SynchroStrategy.Custom.pas"/>
+        <DCCReference Include="..\..\Source\iORM.Http.Server.Executor.pas"/>
+        <DCCReference Include="..\..\Source\iORM.Http.WebBroker.Producer.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

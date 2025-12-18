@@ -205,12 +205,12 @@ end;
 
 class procedure TioCommonBSABehavior.SetObjStatus(const AActiveBindSourceAdapter: IioActiveBindSourceAdapter; const AObjStatus: TioObjStatus);
 begin
-  TioContextFactory.Context(AActiveBindSourceAdapter.Current.ClassName, nil, AActiveBindSourceAdapter.Current, nil, '', '').ObjStatus := AObjStatus;
+  TioContextFactory.Context(itRegular, AActiveBindSourceAdapter.Current.ClassName, nil, AActiveBindSourceAdapter.Current, nil, '', '', BL_DEFAULT).ObjStatus := AObjStatus;
 end;
 
 class function TioCommonBSABehavior.UseObjStatus(const AActiveBindSourceAdapter: IioActiveBindSourceAdapter): Boolean;
 begin
-  Result := TioContextFactory.Context(AActiveBindSourceAdapter.Current.ClassName, nil, AActiveBindSourceAdapter.Current, nil, '', '')
+  Result := TioContextFactory.Context(itRegular, AActiveBindSourceAdapter.Current.ClassName, nil, AActiveBindSourceAdapter.Current, nil, '', '', BL_DEFAULT)
     .GetProperties.ObjStatusPropertyExist;
 end;
 
@@ -643,7 +643,7 @@ begin
   // NB: If it's a property relative to a BindSource virtual field then raise an exception because
   // these type of properties are ReadOnly
   if FField.MemberName.StartsWith('%') then
-    raise EioException.Create(Self.ClassName, 'SetValue',
+    raise EioGenericException.Create(Self.ClassName, 'SetValue',
       Format('Ooops, I see you have set some virtual fields in some BindSource or DataSet (FieldDefs property), they are the ones whose name starts with the character "%%".'
       + #13#13'Note that these type of virtual fields are read-only by design; iORM cannot assign the new value to the field named "%s".' +
       #13#13'Please, try to Assign value to the bind source property directly by code.', [FField.MemberName]));
@@ -674,7 +674,7 @@ begin
     end;
   end
   else
-    raise EioException.Create(Self.ClassName, 'SetValue',
+    raise EioGenericException.Create(Self.ClassName, 'SetValue',
       Format('I am unable to resolve the property path "%s".'#13#13'It could be that one of the objects along the way is nil.', [FField.MemberName]));
 end;
 

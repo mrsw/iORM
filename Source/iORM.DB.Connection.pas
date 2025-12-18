@@ -111,13 +111,13 @@ uses
 function TioConnectionBase.AsDBConnection: IioConnectionDB;
 begin
   if not Self.IsDBConnection then
-    raise EioException.Create(Self.ClassName + '.AsDBConnection: Operation not allowed by this connection type.');
+    raise EioGenericException.Create(Self.ClassName + '.AsDBConnection: Operation not allowed by this connection type.');
 end;
 
 function TioConnectionBase.AsHttpConnection: IioConnectionHttp;
 begin
   if not Self.IsHttpConnection then
-    raise EioException.Create(Self.ClassName + '.AsHttpConnection: Operation not allowed by this connection type.');
+    raise EioGenericException.Create(Self.ClassName + '.AsHttpConnection: Operation not allowed by this connection type.');
 end;
 
 procedure TioConnectionBase.Commit;
@@ -145,12 +145,12 @@ end;
 
 function TioConnectionBase.IsDBConnection: Boolean;
 begin
-  Result := (FConnectionInfo.ConnectionType <> TioConnectionType.ctHTML);
+  Result := (FConnectionInfo.ConnectionType <> TioConnectionType.ctHTTP);
 end;
 
 function TioConnectionBase.IsHttpConnection: Boolean;
 begin
-  Result := (FConnectionInfo.ConnectionType = TioConnectionType.ctHTML);
+  Result := (FConnectionInfo.ConnectionType = TioConnectionType.ctHTTP);
 end;
 
 procedure TioConnectionBase.Rollback;

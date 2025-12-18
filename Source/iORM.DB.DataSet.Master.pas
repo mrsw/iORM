@@ -105,7 +105,8 @@ type
     property AsDefault; // non mettere default
     property TypeName;
     property TypeAlias;
-    property Async default False;
+    property AsyncLoad default False;
+    property AsyncPersist default False;
     property LoadType default ltAuto;
     property Lazy default False;
     property LazyProps;
@@ -149,6 +150,10 @@ type
     property OnWhereClear: TioOnWhereBuilderEvent read FOnWhereClear write FOnWhereClear;
     property AfterWhereBuild: TioAfterWhereBuilderEvent read FAfterWhereBuild write FAfterWhereBuild;
     property AfterWhereClear: TioAfterWhereBuilderEvent read FAfterWhereClear write FAfterWhereClear;
+    // Published Events: persistence concurrency conflicts
+    property OnDeleteConflictException;
+    property OnInsertConflictException;
+    property OnUpdateConflictException;
   end;
 
 implementation

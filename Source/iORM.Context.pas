@@ -41,32 +41,44 @@ uses
   iORM.CommonTypes,
   iORM.Where, iORM.Context.Table.Interfaces, System.Rtti,
   iORM.Context.Map.Interfaces, iORM.Where.Interfaces,
-  iORM.LiveBindings.BSPersistence;
+  iORM.LiveBindings.BSPersistence, iORM.ConflictStrategy.Interfaces,
+  iORM.SynchroStrategy.Interfaces, iORM.Attributes;
 
 type
 
   TioContext = class(TInterfacedObject, IioContext)
-  strict private
+  private
     FDataObject: TObject;
     FHasManyChildVirtualPropertyValue: Integer;
     FMap: IioMap;
     FWhere: IioWhere;
     FMasterPropertyPath: String;
     FMasterBSPersistence: TioBSPersistence;
+    FObjNextVersion: TioObjVersion;
     FOriginalNonTrueClassMap: IioMap;
-    FEtmRevertedFromVersion: Integer;
+    FEntityFromVersion: Integer;
+    FActionType: TioPersistenceActionType;
+    FIntentType: TioPersistenceIntentType;
+    FBlindLevel: Byte;
+    FConflictDetected: Boolean;
+    FConflictState: TioPersistenceConflictState;
+    FSynchroStrategy_Client_NoDirectCall: IioSynchroStrategy_Client;
     // DataObject
     function GetDataObject: TObject;
     procedure SetDataObject(const AValue: TObject);
     // MasterPropertyPath
     function GetMasterPropertyPath: String;
+    // ObjID
+    function GetObjID: Integer;
+    procedure SetObjID(const AValue: Integer);
     // ObjStatus
     function GetObjStatus: TioObjStatus;
     procedure SetObjStatus(const AValue: TioObjStatus);
     // ObjVersion
-    function NextObjVersion(const ASetValue: Boolean): TioObjVersion;
     function GetObjVersion: TioObjVersion;
     procedure SetObjVersion(const AValue: TioObjVersion);
+    // ObjNextVersion
+    function GetObjNextVersion: Integer; // Con tipo TioObjVersion ci sono problemi
     // ObjCreated
     function GetObjCreated: TioObjCreated;
     procedure SetObjCreated(const AValue: TioObjCreated);
@@ -96,22 +108,60 @@ type
     // OriginalResolvedTypeNameNonTrueClass
     procedure SetOriginalNonTrueClassMap(const AMap: IioMap);
     function GetOriginalNonTrueClassMap: IioMap;
-    // EtmRevertedFromVersion
-    function GetEtmRevertedFromVersion: Integer;
-    procedure SetEtmRevertedFromVersion(const Value: Integer);
+    // EtmEntityVersion
+    function GetEntityFromVersion: Integer;
+    procedure SetEntityFromVersion(const Value: Integer);
+    // ActionType
+    function GetActionType: TioPersistenceActionType;
+    procedure SetActionType(const Value: TioPersistenceActionType);
+    // IntentType
+    function GetIntentType: TioPersistenceIntentType;
+    procedure SetIntentType(const Value: TioPersistenceIntentType);
+    // BlindLevel
+    function GetBlindLevel: Byte;
+    procedure SetBlindLevel(const Value: Byte);
+    // ConflictDetected
+    function GetConflictDetected: Boolean;
+    procedure SetConflictDetected(const Value: Boolean);
+    // ConflictState
+    function GetConflictState: TioPersistenceConflictState;
+    procedure SetConflictState(const Value: TioPersistenceConflictState);
   public
-    constructor Create(const AMap: IioMap; const AWhere: IioWhere; const ADataObject: TObject; const AMasterBSPersistence: TioBSPersistence;
-      const AMasterPropertyName, AMasterPropertyPath: String); overload;
+    constructor Create(const AIntent: TioPersistenceIntentType; const AMap: IioMap; const AWhere: IioWhere; const ADataObject: TObject; const AMasterBSPersistence: TioBSPersistence;
+      const AMasterPropertyName, AMasterPropertyPath: String; const ABlindLevel: Byte); overload;
     function GetClassRef: TioClassRef;
-    function GetTable: IioTable;
     function GetProperties: IioProperties;
+    function GetTable: IioTable;
     function GetTrueClass: IioTrueClass;
+    function IDIsNull: Boolean;
     function IsTrueClass: Boolean;
     function RttiContext: TRttiContext;
     function RttiType: TRttiInstanceType;
     function WhereExist: Boolean;
-    function GetID: Integer;
-    function IDIsNull: Boolean;
+    // Conflict strategy methods (to avoid circular reference)
+    procedure CheckDeleteConflict; inline;
+    procedure CheckInsertConflict; inline;
+    procedure CheckUpdateConflict; inline;
+    procedure ResolveDeleteConflict; inline;
+    procedure ResolveInsertConflict; inline;
+    procedure ResolveUpdateConflict; inline;
+    function GetCurrentStrategyName: String;
+    // Synchronization Strategy methods
+    function SynchroStrategy_CanPersistEtmTimeSlot: Boolean;
+    function SynchroStrategy_Client: IioSynchroStrategy_Client; inline;
+    procedure SynchroStrategy_GenerateLocalID;
+    function SynchroStrategy_GetTimeSlotSynchroState: TioEtmTimeSlotSynchroState;
+    function SynchroStrategy_IsToBeSynchronized: Boolean;
+    // BlindLevel helper methods
+    function BlindLevel_Do_DetectObjExists: boolean; inline;
+    function BlindLevel_Do_AutoUpdateProps: boolean; inline;
+    function BlindLevel_Do_DetectConflicts: boolean; inline;
+    procedure BlindLevel_Set_DetectObjExists; inline;
+    procedure BlindLevel_Set_AutoUpdateProps; inline;
+    procedure BlindLevel_Set_DetectConflicts; inline;
+    procedure BlindLevel_Reset_DetectObjExists; inline;
+    procedure BlindLevel_Reset_AutoUpdateProps; inline;
+    procedure BlindLevel_Reset_DetectConflicts; inline;
     // Map
     function Map: IioMap;
     // GroupBy
@@ -120,8 +170,10 @@ type
     function GetOrderBySql: String;
     // Properties
     property DataObject: TObject read GetDataObject write SetDataObject;
+    property ObjID: Integer read GetObjID write SetObjID;
     property ObjStatus: TioObjStatus read GetObjStatus write SetObjStatus;
     property ObjVersion: TioObjVersion read GetObjVersion write SetObjVersion;
+    property ObjNextVersion: Integer read GetObjNextVersion; // Con tipo TioObjVersion ci sono problemi
     property ObjCreated: TioObjCreated read GetObjCreated write SetObjCreated;
     property ObjCreatedUserID: TioObjCreatedUserID read GetObjCreatedUserID write SetObjCreatedUserID;
     property ObjCreatedUserName: TioObjCreatedUserName read GetObjCreatedUserName write SetObjCreatedUserName;
@@ -132,7 +184,12 @@ type
     property RelationOID: Integer read GetRelationOID write SetRelationOID;
     property MasterPropertyPath: String read GetMasterPropertyPath;
     property MasterBSPersistence: TioBSPersistence read GetMasterBSPersistence;
-    property EtmRevertedFromVersion: Integer read GetEtmRevertedFromVersion write SetEtmRevertedFromVersion;
+    property EntityFromVersion: Integer read GetEntityFromVersion write SetEntityFromVersion;
+    property ActionType: TioPersistenceActionType read GetActionType write SetActionType;
+    property IntentType: TioPersistenceIntentType read GetIntentType write SetIntentType;
+    property BlindLevel: Byte read GetBlindLevel write SetBlindLevel;
+    property ConflictDetected: Boolean read GetConflictDetected write SetConflictDetected;
+    property ConflictState: TioPersistenceConflictState read GetConflictState write SetConflictState;
     /// Contiene il nome della classe originaria cioè, nel caso il contesto sia stato creato con
     ///  la TrueClassVirtual (select query) a partire da una resolved class name, contiene il nome
     ///  della classe originaria, quella dalla quale poi si è estratta la TrueClassVirtualMap stessa.
@@ -144,7 +201,8 @@ implementation
 uses
   iORM.Context.Factory, iORM.DB.Factory, System.TypInfo,
   iORM.Context.Container, System.SysUtils, iORM.Exceptions,
-  System.StrUtils, iORM.DB.Interfaces;
+  System.StrUtils, iORM.DB.Interfaces, iORM, iORM.DB.ConnectionContainer,
+  iORM.Utilities, iORM.SynchroStrategy.Custom;
 
 { TioContext }
 
@@ -153,8 +211,89 @@ begin
   Result := Self.Map.GetTable.GetTrueClass;
 end;
 
-constructor TioContext.Create(const AMap: IioMap; const AWhere: IioWhere; const ADataObject: TObject; const AMasterBSPersistence: TioBSPersistence;
-  const AMasterPropertyName, AMasterPropertyPath: String);
+function TioContext.BlindLevel_Do_AutoUpdateProps: boolean;
+begin
+  Result := TioUtilities.BlindLevel_Do_AutoUpdateProps(FBlindLevel);
+end;
+
+function TioContext.BlindLevel_Do_DetectConflicts: boolean;
+begin
+  Result := TioUtilities.BlindLevel_Do_DetectConflicts(FBlindLevel);
+end;
+
+function TioContext.BlindLevel_Do_DetectObjExists: boolean;
+begin
+  Result := TioUtilities.BlindLevel_Do_DetectObjExists(FBlindLevel);
+end;
+
+procedure TioContext.BlindLevel_Reset_AutoUpdateProps;
+begin
+  if BlindLevel_Do_AutoUpdateProps then
+    Dec(FBlindLevel, BL_BIT_AUTO_UPDATE_PROPS);
+end;
+
+procedure TioContext.BlindLevel_Reset_DetectConflicts;
+begin
+  if BlindLevel_Do_DetectConflicts then
+    Dec(FBlindLevel, BL_BIT_DETECT_CONFLICTS);
+end;
+
+procedure TioContext.BlindLevel_Reset_DetectObjExists;
+begin
+  if BlindLevel_Do_DetectObjExists then
+    Dec(FBlindLevel, BL_BIT_DETECT_OBJ_EXISTS);
+end;
+
+procedure TioContext.BlindLevel_Set_AutoUpdateProps;
+begin
+  if not BlindLevel_Do_AutoUpdateProps then
+    Inc(FBlindLevel, BL_BIT_AUTO_UPDATE_PROPS);
+end;
+
+procedure TioContext.BlindLevel_Set_DetectConflicts;
+begin
+  if not BlindLevel_Do_DetectConflicts then
+    Inc(FBlindLevel, BL_BIT_DETECT_CONFLICTS);
+end;
+
+procedure TioContext.BlindLevel_Set_DetectObjExists;
+begin
+  if not BlindLevel_Do_DetectObjExists then
+    Inc(FBlindLevel, BL_BIT_DETECT_OBJ_EXISTS);
+end;
+
+procedure TioContext.CheckDeleteConflict;
+begin
+  TioCustomConflictStrategyRef(GetTable.GetDeleteConflictStrategy).CheckDeleteConflict(Self);
+end;
+
+procedure TioContext.CheckInsertConflict;
+begin
+  TioCustomConflictStrategyRef(GetTable.GetInsertConflictStrategy).CheckInsertConflict(Self);
+end;
+
+procedure TioContext.CheckUpdateConflict;
+begin
+  TioCustomConflictStrategyRef(GetTable.GetUpdateConflictStrategy).CheckUpdateConflict(Self);
+end;
+
+procedure TioContext.ResolveDeleteConflict;
+begin
+  TioCustomConflictStrategyRef(GetTable.GetDeleteConflictStrategy).ResolveDeleteConflict(Self);
+end;
+
+procedure TioContext.ResolveInsertConflict;
+begin
+  TioCustomConflictStrategyRef(GetTable.GetInsertConflictStrategy).ResolveInsertConflict(Self);
+end;
+
+procedure TioContext.ResolveUpdateConflict;
+begin
+  TioCustomConflictStrategyRef(GetTable.GetUpdateConflictStrategy).ResolveUpdateConflict(Self);
+end;
+
+constructor TioContext.Create(const AIntent: TioPersistenceIntentType; const AMap: IioMap; const AWhere: IioWhere; const ADataObject: TObject; const AMasterBSPersistence: TioBSPersistence;
+      const AMasterPropertyName, AMasterPropertyPath: String; const ABlindLevel: Byte);
 begin
   inherited Create;
   FMap := AMap;
@@ -163,8 +302,15 @@ begin
   FHasManyChildVirtualPropertyValue := 0;
   FMasterPropertyPath := AMasterPropertyPath + IfThen(AMasterPropertyName.IsEmpty, '', '.') + AMasterPropertyName;
   FMasterBSPersistence := AMasterBSPersistence;
+  FObjNextVersion := OBJVERSION_NULL;
   FOriginalNonTrueClassMap := nil;
-  FEtmRevertedFromVersion := 0;
+  FEntityFromVersion := 0;
+  FIntentType := AIntent;
+  FActionType := atDoNotPersist;
+  FBlindLevel := ABlindLevel;
+  FConflictDetected := False;
+  FConflictState := csUndefined;
+  FSynchroStrategy_Client_NoDirectCall := nil;
 end;
 
 function TioContext.GetClassRef: TioClassRef;
@@ -177,9 +323,9 @@ begin
   Result := FDataObject;
 end;
 
-function TioContext.GetEtmRevertedFromVersion: Integer;
+function TioContext.GetEntityFromVersion: Integer;
 begin
-  Result := FEtmRevertedFromVersion;
+  Result := FEntityFromVersion;
 end;
 
 function TioContext.GetGroupBySql: String;
@@ -198,10 +344,24 @@ begin
   Result := FHasManyChildVirtualPropertyValue;
 end;
 
-function TioContext.GetID: Integer;
+function TioContext.GetCurrentStrategyName: String;
+begin
+  case FActionType of
+    atInsert:
+      Result := String.Empty;
+    atUpdate:
+      Result := TioCustomConflictStrategyRef(GetTable.UpdateConflictStrategy).Name;
+    atDelete:
+      Result := TioCustomConflictStrategyRef(GetTable.DeleteConflictStrategy).Name;
+  else
+    raise EioGenericException.Create(ClassName, 'GetCurrentStrategyName', 'Undefined action type.');
+  end;  
+end;
+
+function TioContext.GetObjID: Integer;
 begin
   if not Assigned(FDataObject) then
-    raise EioException.Create(Self.ClassName + '.GetID: DataObject not assigned');
+    raise EioGenericException.Create(Self.ClassName + '.GetID: DataObject not assigned');
   Result := GetProperties.GetIdProperty.GetValue(FDataObject).AsInteger;
 end;
 
@@ -228,7 +388,7 @@ begin
   if GetProperties.ObjCreatedUserIDPropertyExist then
     Result := GetProperties.ObjCreatedUserIDProperty.GetValue(FDataObject).AsType<TioObjCreatedUserID>
   else
-    Result := IO_CURRENTUSERINFO_ID_EMPTY;
+    Result := IO_INTEGER_NULL_VALUE;
 end;
 
 function TioContext.GetObjCreatedUserName: TioObjCreatedUserName;
@@ -236,7 +396,7 @@ begin
   if GetProperties.ObjCreatedUserNamePropertyExist then
     Result := GetProperties.ObjCreatedUserNameProperty.GetValue(FDataObject).AsType<TioObjCreatedUserName>
   else
-    Result := IO_CURRENTUSERINFO_NAME_EMPTY;
+    Result := IO_STRING_NULL_VALUE;
 end;
 
 function TioContext.GetObjStatus: TioObjStatus;
@@ -260,7 +420,7 @@ begin
   if GetProperties.ObjUpdatedUserIDPropertyExist then
     Result := GetProperties.ObjUpdatedUserIDProperty.GetValue(FDataObject).AsType<TioObjUpdatedUserID>
   else
-    Result := IO_CURRENTUSERINFO_ID_EMPTY;
+    Result := IO_INTEGER_NULL_VALUE;
 end;
 
 function TioContext.GetObjUpdatedUserName: TioObjUpdatedUserName;
@@ -268,7 +428,7 @@ begin
   if GetProperties.ObjUpdatedUserNamePropertyExist then
     Result := GetProperties.ObjUpdatedUserNameProperty.GetValue(FDataObject).AsType<TioObjUpdatedUserName>
   else
-    Result := IO_CURRENTUSERINFO_NAME_EMPTY;
+    Result := IO_STRING_NULL_VALUE;
 end;
 
 function TioContext.GetOrderBySql: String;
@@ -282,6 +442,31 @@ begin
     Result := FOriginalNonTrueClassMap
   else
     Result := FMap;
+end;
+
+function TioContext.GetActionType: TioPersistenceActionType;
+begin
+  Result := FActionType;
+end;
+
+function TioContext.GetBlindLevel: Byte;
+begin
+  Result := FBlindLevel;
+end;
+
+function TioContext.GetConflictDetected: Boolean;
+begin
+  Result := FConflictDetected;
+end;
+
+function TioContext.GetConflictState: TioPersistenceConflictState;
+begin
+  Result := FConflictState;
+end;
+
+function TioContext.GetIntentType: TioPersistenceIntentType;
+begin
+  Result := FIntentType;
 end;
 
 function TioContext.GetProperties: IioProperties;
@@ -304,9 +489,9 @@ begin
   FDataObject := AValue;
 end;
 
-procedure TioContext.SetEtmRevertedFromVersion(const Value: Integer);
+procedure TioContext.SetEntityFromVersion(const Value: Integer);
 begin
-  FEtmRevertedFromVersion := Value;
+  FEntityFromVersion := Value;
 end;
 
 procedure TioContext.SetRelationOID(const Value: Integer);
@@ -342,6 +527,14 @@ begin
     Exit;
   LPropValue := TValue.From<TioObjCreatedUserName>(AValue);
   GetProperties.ObjCreatedUserNameProperty.SetValue(FDataObject, LPropValue);
+end;
+
+procedure TioContext.SetObjID(const AValue: Integer);
+var
+  LPropValue: TValue;
+begin
+  LPropValue := TValue.From<Integer>(AValue);
+  GetProperties.GetIdProperty.SetValue(FDataObject, LPropValue);
 end;
 
 procedure TioContext.SetObjStatus(const AValue: TioObjStatus);
@@ -386,10 +579,9 @@ end;
 
 procedure TioContext.SetObjVersion(const AValue: TioObjVersion);
 begin
+  // note: if the ObjVersion property does not exist it should not raise any exceptions.
   if GetProperties.ObjVersionPropertyExist then
-    GetProperties.ObjVersionProperty.SetValue(FDataObject, AValue)
-  else
-    raise EioException.Create(ClassName, 'SetObjVersion', Format('The class "%s" has no property of type "TioObjversion".', [Map.GetClassName]));
+    GetProperties.ObjVersionProperty.SetValue(FDataObject, AValue);
 end;
 
 function TioContext.GetObjVersion: TioObjVersion;
@@ -403,6 +595,31 @@ end;
 procedure TioContext.SetOriginalNonTrueClassMap(const AMap: IioMap);
 begin
   FOriginalNonTrueClassMap := AMap;
+end;
+
+procedure TioContext.SetActionType(const Value: TioPersistenceActionType);
+begin
+  FActionType := Value;
+end;
+
+procedure TioContext.SetBlindLevel(const Value: Byte);
+begin
+  FBlindLevel := Value;
+end;
+
+procedure TioContext.SetConflictDetected(const Value: Boolean);
+begin
+  FConflictDetected := Value;
+end;
+
+procedure TioContext.SetConflictState(const Value: TioPersistenceConflictState);
+begin
+  FConflictState := Value;
+end;
+
+procedure TioContext.SetIntentType(const Value: TioPersistenceIntentType);
+begin
+  FIntentType := Value;
 end;
 
 procedure TioContext.SetWhere(const AWhere: IioWhere);
@@ -427,24 +644,107 @@ end;
 
 function TioContext.IDIsNull: Boolean;
 begin
-  Result := (not Assigned(FDataObject)) or (GetID = IO_INTEGER_NULL_VALUE);
+  Result := (not Assigned(FDataObject)) or (GetObjID = IO_INTEGER_NULL_VALUE);
 end;
 
-function TioContext.NextObjVersion(const ASetValue: Boolean): TioObjVersion;
+function TioContext.GetObjNextVersion: Integer;
 var
-  LPropValue: TValue;
+  LSynchroStrategy_Client: IioSynchroStrategy_Client;
 begin
-  if GetProperties.ObjVersionPropertyExist then
+  // If the ObjVersion property does not exists then return the OBJVERSION_NULL (zero)
+  if not GetProperties.ObjVersionPropertyExist then
+    Exit(OBJVERSION_NULL);
+  // If a SynchroStrategy is assigned and active (local remote and not connected device) then ask to it
+  //  the next ObjVersion (normally the Objversion increment is disable if the current device is a remote device with synchronization).
+  //  Else if a SynchroStrategy is NOT assigned then load the last ObjVersion from the DB (from the db because someone else in the
+  //  meantime could have saved a new version)
+  // If the ObjVersion is not already loaded then load it (once)
+  if FObjNextVersion = OBJVERSION_NULL then
   begin
-    Result := GetProperties.ObjVersionProperty.GetValue(FDataObject).AsType<TioObjVersion> + 1;
-    if ASetValue then
-    begin
-      LPropValue := TValue.From<TioObjVersion>(Result);
-      GetProperties.ObjVersionProperty.SetValue(FDataObject, LPropValue);
-    end;
-  end
+    LSynchroStrategy_Client := SynchroStrategy_Client;
+    if (LSynchroStrategy_Client <> nil) then
+      FObjNextVersion := LSynchroStrategy_Client.GetNextObjVersion(Self)
+    else
+      FObjNextVersion := io.LoadObjVersion(Self) + 1;
+  end;
+  // Return the value
+  Result := FObjNextVersion;
+end;
+
+procedure TioContext.SynchroStrategy_GenerateLocalID;
+var
+  LSynchroStrategy_Client: IioSynchroStrategy_Client;
+begin
+  // If a SynchroStrategy is assigned and active (local remote and not connected device) and the object ID
+  //  is not assigned then it asks the SynchroStrategy for a temporary local ID.
+  // Note: Obviously if a new ID is assigned by SynchroStrategy this will disable the normal ID generation (if generated ID is not NULL)
+  LSynchroStrategy_Client := SynchroStrategy_Client;
+  // If is to be synchronized...
+  if (LSynchroStrategy_Client <> nil) and IDIsNull and LSynchroStrategy_Client.IsToBeSynchronized(Self) then
+    GetProperties.GetIdProperty.SetValue(DataObject, LSynchroStrategy_Client.GenerateLocalID(Self));
+end;
+
+function TioContext.SynchroStrategy_GetTimeSlotSynchroState: TioEtmTimeSlotSynchroState;
+begin
+  // Determines the TimeSlotSynchroState based on the intent and whether or not it is a class to synchronize
+  case FIntentType of
+    itRegular, itRevert:
+      if SynchroStrategy_IsToBeSynchronized then
+        Result := stToBeSynchronized
+      else
+        Result := stRegular;
+    itSynchro_PersistToServer:
+      if SynchroStrategy_IsToBeSynchronized then
+        Result := stToBeSynchronized
+      else
+        Result := stSynchronized_ReceivedFromClient;
+    itSynchro_PersistToClient:
+      Result := stSynchronized_ReceivedFromServer;
   else
-    Result := OBJVERSION_NULL;
+    Result := stRegular;
+  end;
+end;
+
+function TioContext.SynchroStrategy_CanPersistEtmTimeSlot: Boolean;
+var
+  LSynchroStrategy_Client: IioSynchroStrategy_Client;
+begin
+  // Get the SynchroStrategy if exists
+  LSynchroStrategy_Client := SynchroStrategy_Client;
+  // If there is a SinchroStrategy, it determines whether the TimeSlot should be created
+  //  and persisted based on the intent of the operation and the properties of th
+  //  SynchroStrategy itself.
+  Result := True;
+  if Assigned(LSynchroStrategy_Client) then
+  begin
+    case FIntentType of
+      itRegular, itRevert, itSynchro_PersistToServer:
+        if SynchroStrategy_IsToBeSynchronized then
+          Result := LSynchroStrategy_Client.EtmTimeSlot_Persist_ToBeSynchronized
+        else
+          Result := LSynchroStrategy_Client.EtmTimeSlot_Persist_Regular;
+      itSynchro_PersistToClient:
+        Result := LSynchroStrategy_Client.EtmTimeSlot_Persist_ReceivedFromServer;
+    end;
+  end;
+end;
+
+function TioContext.SynchroStrategy_Client: IioSynchroStrategy_Client;
+begin
+  if not Assigned(FSynchroStrategy_Client_NoDirectCall) then
+    FSynchroStrategy_Client_NoDirectCall := TioConnectionManager.GetSynchroStrategy_Client(GetTable.GetConnectionDefName);
+  Result := FSynchroStrategy_Client_NoDirectCall;
+end;
+
+function TioContext.SynchroStrategy_IsToBeSynchronized: Boolean;
+var
+  LSynchroStrategy_Client: IioSynchroStrategy_Client;
+begin
+  // If a SynchroStrategy is assigned and active (local remote and not connected device) and the object ID
+  //  is not assigned then it asks the SynchroStrategy for a temporary local ID.
+  // Note: Obviously if a new ID is assigned by SynchroStrategy this will disable the normal ID generation (if generated ID is not NULL)
+  LSynchroStrategy_Client := SynchroStrategy_Client;
+  Result := (LSynchroStrategy_Client <> nil) and LSynchroStrategy_Client.IsToBeSynchronized(Self);
 end;
 
 function TioContext.IsTrueClass: Boolean;

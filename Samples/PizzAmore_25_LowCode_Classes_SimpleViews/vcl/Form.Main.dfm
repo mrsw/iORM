@@ -4,22 +4,22 @@ object MainForm: TMainForm
   BorderIcons = [biSystemMenu, biMinimize]
   BorderStyle = bsSingle
   Caption = 'Pizz'#39'Amore'
-  ClientHeight = 545
-  ClientWidth = 280
+  ClientHeight = 540
+  ClientWidth = 284
   Color = clWhite
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -12
   Font.Name = 'Segoe UI'
   Font.Style = []
-  Position = poDesktopCenter
+  Position = poScreenCenter
   DesignSize = (
-    280
-    545)
+    284
+    540)
   TextHeight = 15
   object ImagePizza: TImage
     Left = 8
-    Top = 64
+    Top = 65
     Width = 268
     Height = 249
     Picture.Data = {
@@ -8464,6 +8464,7 @@ object MainForm: TMainForm
       FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
       FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF}
     Stretch = True
+    OnMouseDown = ImagePizzaMouseDown
   end
   object LabelTitlePizz: TLabel
     Left = 48
@@ -8480,14 +8481,15 @@ object MainForm: TMainForm
   end
   object Shape1: TShape
     Left = 0
-    Top = 322
-    Width = 280
+    Top = 317
+    Width = 284
     Height = 223
     Align = alBottom
     Brush.Color = clNavy
     Pen.Style = psClear
-    ExplicitTop = 312
-    ExplicitWidth = 284
+    ExplicitLeft = 8
+    ExplicitTop = 320
+    ExplicitWidth = 288
   end
   object LabelTitleAmore: TLabel
     Left = 130
@@ -8503,10 +8505,10 @@ object MainForm: TMainForm
     ParentFont = False
   end
   object ButtonOrders: TButton
-    Left = 43
-    Top = 336
-    Width = 165
-    Height = 44
+    Left = 42
+    Top = 328
+    Width = 182
+    Height = 40
     Action = acShowOrders
     Anchors = [akLeft, akRight, akBottom]
     Font.Charset = DEFAULT_CHARSET
@@ -8516,14 +8518,14 @@ object MainForm: TMainForm
     Font.Style = [fsBold]
     ParentFont = False
     TabOrder = 0
-    ExplicitTop = 335
-    ExplicitWidth = 161
+    ExplicitTop = 327
+    ExplicitWidth = 178
   end
   object ButtonCustomers: TButton
-    Left = 43
-    Top = 386
-    Width = 165
-    Height = 44
+    Left = 42
+    Top = 373
+    Width = 182
+    Height = 40
     Action = acShowCustomers
     Anchors = [akLeft, akRight, akBottom]
     Font.Charset = DEFAULT_CHARSET
@@ -8533,14 +8535,14 @@ object MainForm: TMainForm
     Font.Style = [fsBold]
     ParentFont = False
     TabOrder = 1
-    ExplicitTop = 385
-    ExplicitWidth = 161
+    ExplicitTop = 372
+    ExplicitWidth = 178
   end
   object ButtonPizzas: TButton
-    Left = 43
-    Top = 436
-    Width = 165
-    Height = 44
+    Left = 42
+    Top = 418
+    Width = 182
+    Height = 40
     Action = acShowPizzas
     Anchors = [akLeft, akRight, akBottom]
     Font.Charset = DEFAULT_CHARSET
@@ -8550,14 +8552,14 @@ object MainForm: TMainForm
     Font.Style = [fsBold]
     ParentFont = False
     TabOrder = 2
-    ExplicitTop = 435
-    ExplicitWidth = 161
+    ExplicitTop = 417
+    ExplicitWidth = 178
   end
   object ButtonQuit: TButton
-    Left = 43
-    Top = 501
-    Width = 165
-    Height = 32
+    Left = 42
+    Top = 499
+    Width = 182
+    Height = 30
     Action = acQuit
     Anchors = [akLeft, akRight, akBottom]
     Font.Charset = DEFAULT_CHARSET
@@ -8567,27 +8569,62 @@ object MainForm: TMainForm
     Font.Style = []
     ParentFont = False
     TabOrder = 3
-    ExplicitTop = 500
-    ExplicitWidth = 161
+    ExplicitTop = 498
+    ExplicitWidth = 178
+  end
+  object ButtonIngredients: TButton
+    Left = 42
+    Top = 463
+    Width = 71
+    Height = 31
+    Action = acShowIngredients
+    Anchors = [akLeft, akRight, akBottom]
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -16
+    Font.Name = 'Segoe UI'
+    Font.Style = []
+    ParentFont = False
+    TabOrder = 4
+    ExplicitTop = 462
+    ExplicitWidth = 67
+  end
+  object ButtonSynchroLogs: TButton
+    Left = 127
+    Top = 463
+    Width = 97
+    Height = 31
+    Action = acShowSynchroLogs
+    Anchors = [akLeft, akRight, akBottom]
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -16
+    Font.Name = 'Segoe UI'
+    Font.Style = []
+    ParentFont = False
+    TabOrder = 5
+    ExplicitTop = 462
+    ExplicitWidth = 93
   end
   object ioVCL1: TioVCL
-    Left = 8
-    Top = 272
+    Left = 18
+    Top = 265
   end
   object SQLiteConn: TioSQLiteConnectionDef
-    AsDefault = True
+    AsDefault = False
     AutoCreateDB.Enabled = True
     Database = 'PizzAmore_25_LowCode_Classes_SimpleViews_Vcl.db'
     DatabaseStdFolder = sfDocuments
     Persistent = False
     Pooled = False
     OnAfterCreateOrAlterDB = SQLiteConnAfterCreateOrAlterDB
-    Left = 64
-    Top = 272
+    OnBeforeCreateOrAlterDB = SQLiteConnBeforeCreateOrAlterDB
+    Left = 84
+    Top = 265
   end
   object ActionList1: TActionList
-    Left = 216
-    Top = 272
+    Left = 228
+    Top = 265
     object acQuit: TioBSCloseQuery
       Category = 'iORM-BS'
       Caption = 'Quit'
@@ -8621,5 +8658,50 @@ object MainForm: TMainForm
       ViewContextBy = vcByDefaultViewContextProvider
       VVMTypeAlias = 'LIST'
     end
+    object acShowIngredients: TioBSShowOrSelect
+      Category = 'iORM - BS'
+      Caption = 'Ingreds'
+      Action_ParentCloseQueryAction = acQuit
+      EntityTypeName = 'TIngredient'
+      ShowMode = smEntityTypeName
+      ViewContextBy = vcByDefaultViewContextProvider
+      VVMTypeAlias = 'LIST'
+    end
+    object acShowSynchroLogs: TioBSShowOrSelect
+      Category = 'iORM - BS'
+      Caption = 'Synchro log'
+      Action_ParentCloseQueryAction = acQuit
+      EntityTypeName = 'TioEtmSynchroStrategy_LogItem'
+      ShowMode = smEntityTypeName
+      ViewContextBy = vcByDefaultViewContextProvider
+      VVMTypeAlias = 'LIST'
+    end
+  end
+  object HttpConn: TioHttpConnectionDef
+    AsDefault = False
+    BaseURL = 'http://localhost:8080/iorm'
+    Persistent = True
+    Left = 157
+    Top = 265
+  end
+  object FirebirdConn: TioFirebirdConnectionDef
+    AsDefault = True
+    AutoCreateDB.Enabled = True
+    CharSet = 'utf8'
+    Database = 'PizzAmore_25_LowCode_Classes_SimpleViews_Vcl.fdb'
+    DatabaseStdFolder = sfDocuments
+    OSAuthent = oaNo
+    Password = 'masterkey'
+    Persistent = False
+    Pooled = False
+    Port = 3054
+    Protocol = pTCPIP
+    Server = 'localhost'
+    SQLDialect = sqlDialect3
+    UserName = 'SYSDBA'
+    OnAfterCreateOrAlterDB = FirebirdConnAfterCreateOrAlterDB
+    OnBeforeCreateOrAlterDB = FirebirdConnBeforeCreateOrAlterDB
+    Left = 88
+    Top = 208
   end
 end

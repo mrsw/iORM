@@ -41,36 +41,77 @@ uses
 
 type
 
-  EioException = class(Exception)
+  // Base class for all iORM exceptions ------------------------------------------------------------
+  EioCustomException = class(Exception)
   public
     constructor Create(const AClassName, AMethodName, AMsg: string); overload;
     constructor Create(const AClassName, AMsg: string); overload;
   end;
+  // -----------------------------------------------------------------------------------------------
 
-  EioConcurrencyConflictException = class(EioException)
+  // Generic iORM exceptions -----------------------------------------------------------------------
+  EioGenericException = class(EioCustomException)
+  end;
+  // -----------------------------------------------------------------------------------------------
+
+  // Generic iORM exceptions -----------------------------------------------------------------------
+  EioArgumentNilException = class(EioCustomException)
+  end;
+  // -----------------------------------------------------------------------------------------------
+
+  // Persistence concurrency conflict exceptions ---------------------------------------------------
+  EioConcurrencyConflictException = class(EioCustomException)
   public
     constructor Create(const AClassName, AMethodName: string; const AContext: IioContext); overload;
   end;
 
-  EioBindSourceObjStateException = class(EioException)
+  EioDeleteConflictException = class(EioConcurrencyConflictException)
   end;
 
-  EioEtmException = class(EioException)
+  EioUpdateConflictException = class(EioConcurrencyConflictException)
   end;
 
+  EioInsertConflictException = class(EioConcurrencyConflictException)
+  end;
+  // -----------------------------------------------------------------------------------------------
+
+  // BindSource ObjState exceptions ----------------------------------------------------------------
+  EioBindSourceObjStateException = class(EioCustomException)
+  end;
+  // -----------------------------------------------------------------------------------------------
+
+  // ETM exceptions --------------------------------------------------------------------------------
+  EioEtmException = class(EioCustomException)
+  end;
+  // -----------------------------------------------------------------------------------------------
+
+  // SynchroStrategy exceptions --------------------------------------------------------------------
+  EioSynchroStrategyException = class(EioCustomException)
+  end;
+  // -----------------------------------------------------------------------------------------------
+
+  // Http exceptions -------------------------------------------------------------------------------
+  EioHttpLocalException = class(EioCustomException)
+  end;
+
+  EioHttpRemoteException = class(EioCustomException)
+  public
+    constructor Create(const AClassName, AMethodName, ARemoteExceptionClassName, ARemoteExceptionMessage: string); overload;
+  end;
+  // -----------------------------------------------------------------------------------------------
 
 implementation
 
 { EioException }
 
-constructor EioException.Create(const AClassName, AMethodName, AMsg: string);
+constructor EioCustomException.Create(const AClassName, AMethodName, AMsg: string);
 begin
-  inherited Create(Format(#13'iORM exception on "%s.%s":'#13#13'%s', [AClassName, AMethodName, AMsg]));
+  inherited Create(Format(#13#13'iORM exception on "%s.%s" method:'#13#13'%s', [AClassName, AMethodName, AMsg]));
 end;
 
-constructor EioException.Create(const AClassName, AMsg: string);
+constructor EioCustomException.Create(const AClassName, AMsg: string);
 begin
-  inherited Create(Format(#13'iORM exception on "%s":'#13#13'%s', [AClassName, AMsg]));
+  inherited Create(Format(#13#13'iORM exception on "%s" class:'#13#13'%s', [AClassName, AMsg]));
 end;
 
 { EioConcurrencyConflictException }
@@ -81,11 +122,19 @@ var
 begin
   if AContext.GetProperties.ObjVersionPropertyExist then
     LMsg := Format('Concurrency conflict persisting a "%s" entity with ID = %d, ObjVersion = %d on table "%s" using "%s" connection.',
-      [AContext.GetClassRef.ClassName, AContext.GetID, AContext.ObjVersion, AContext.GetTable.TableName, AContext.GetTable.GetConnectionDefName])
+      [AContext.GetClassRef.ClassName, AContext.ObjID, Abs(AContext.ObjVersion), AContext.GetTable.TableName, AContext.GetTable.GetConnectionDefName])
   else
     LMsg := Format('Concurrency conflict persisting a "%s" entity with ID = %d on table "%s" using "%s" connection.',
-      [AContext.GetClassRef.ClassName, AContext.GetID, AContext.GetTable.TableName, AContext.GetTable.GetConnectionDefName]);
+      [AContext.GetClassRef.ClassName, AContext.ObjID, AContext.GetTable.TableName, AContext.GetTable.GetConnectionDefName]);
   inherited Create(AClassName, AMethodName, LMsg);
+end;
+
+{ EioHttpRemoteException }
+
+constructor EioHttpRemoteException.Create(const AClassName, AMethodName, ARemoteExceptionClassName, ARemoteExceptionMessage: string);
+begin
+  inherited Create(Format(#13#13'iORM local exception on "%s.%s" method'#13'RELAYING remote "%s" exception:'#13'%s',
+    [AClassName, AMethodName, ARemoteExceptionClassName, ARemoteExceptionMessage]));
 end;
 
 end.

@@ -36,8 +36,8 @@ unit iORM.Context.Table.Interfaces;
 interface
 
 uses
-  iORM.CommonTypes, System.Generics.Collections, System.Rtti, iORM.Interfaces,
-  iORM.Attributes;
+  System.Generics.Collections, System.Rtti, iORM.Interfaces,
+  iORM.Attributes, iORM.CommonTypes;
 
 type
 
@@ -84,28 +84,52 @@ type
   end;
 
   TioIndexList = TList<ioIndex>;
+  TEtmPropToPropList = TList<etmPropertyAttribute>; // etmProperty attribute
 
   IioTable = interface(IioSqlItem)
     ['{715BFF11-0A82-4B39-B002-451854729DC2}']
     /// This method create the TrueClassVirtualMap.Table object duplicating something of itself
     function DuplicateForTrueClassMap: IioTable;
+    function GetClassName: String;
+    function GetConnectionDefName: String;
+    function GetGroupBy: IioGroupBy;
+    function GetJoin: IioJoins;
+    function GetKeyGenerator: String;
+    function GetMapMode: TioMapModeType;
+    function GetQualifiedClassName: String;
+    function GetRttiType: TRttiInstanceType;
     function GetTrueClass: IioTrueClass;
+    function IsForThisConnection(AConnectionDefNameToCheck: String): Boolean;
+    function IsNotPersistedEntity: Boolean;
     function IsTrueClass: Boolean;
     function TableName: String;
-    function GetKeyGenerator: String;
-    function GetJoin: IioJoins;
-    function GetGroupBy: IioGroupBy;
-    function GetConnectionDefName: String;
-    function IsForThisConnection(AConnectionDefNameToCheck: String): Boolean;
-    function GetMapMode: TioMapModeType;
-    function GetRttiType: TRttiInstanceType;
-    function IsNotPersistedEntity: Boolean;
-    function GetClassName: String;
-    function GetQualifiedClassName: String;
     // IndexList
     function IndexListExists: Boolean;
     function GetIndexList(AAutoCreateIfUnassigned:Boolean): TioIndexList;
     procedure SetIndexList(AIndexList:TioIndexList);
+    // Conflict strategies (TClass instead of TioCustomConflictStrategyRef to avoid circular reference)
+    procedure SetDeleteConflictStrategy(const AConflictStrategy: TClass);
+    procedure SetInsertConflictStrategy(const AConflictStrategy: TClass);
+    procedure SetUpdateConflictStrategy(const AConflictStrategy: TClass);
+    procedure SetDeleteConflictStrategy_OnConflictSetStateAs(const Value: TioPersistenceConflictState);
+    procedure SetInsertConflictStrategy_OnConflictSetStateAs(const Value: TioPersistenceConflictState);
+    procedure SetUpdateConflictStrategy_OnConflictSetStateAs(const Value: TioPersistenceConflictState);
+    function GetDeleteConflictStrategy: TClass;
+    function GetInsertConflictStrategy: TClass;
+    function GetupdateConflictStrategy: TClass;
+    function GetDeleteConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState;
+    function GetInsertConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState;
+    function GetUpdateConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState;
+    property DeleteConflictStrategy: TClass read GetDeleteConflictStrategy write SetDeleteConflictStrategy;
+    property InsertConflictStrategy: TClass read GetInsertConflictStrategy write SetInsertConflictStrategy;
+    property UpdateConflictStrategy: TClass read GetUpdateConflictStrategy write SetUpdateConflictStrategy;
+    property DeleteConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState read GetDeleteConflictStrategy_OnConflictSetStateAs write SetDeleteConflictStrategy_OnConflictSetStateAs;
+    property InsertConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState read GetInsertConflictStrategy_OnConflictSetStateAs write SetInsertConflictStrategy_OnConflictSetStateAs;
+    property UpdateConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState read GetUpdateConflictStrategy_OnConflictSetStateAs write SetUpdateConflictStrategy_OnConflictSetStateAs;
+    // ETM prop to prop list
+    function EtmPropToPropListExists: Boolean;
+    function GetEtmPropToPropList(AAutoCreateIfUnassigned: Boolean): TEtmPropToPropList;
+    procedure SetEtmPropToPropList(AEtmPropToPropList: TEtmPropToPropList);
     // EtmTimeSlotClass
     procedure SetEtmTimeSlotClass(const AEtmTimeSlotClass: TioEtmTimeSlotRef);
     function GetEtmTimeSlotClass: TioEtmTimeSlotRef;

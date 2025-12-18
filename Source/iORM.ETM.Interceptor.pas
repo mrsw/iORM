@@ -48,8 +48,12 @@ uses
 type
 
   TioEtmInterceptor = class(TioCustomCRUDInterceptor)
+  private
+    class procedure _SetEntityFromVersion(const AContext: IioContext); inline;
+    class procedure _CreateAndPersistNewTimeSlot_Internal(const AContext: IioContext); inline;
   public
     // Insert
+    class procedure BeforeInsert(const AContext: IioContext; var ADone: Boolean); override;
     class procedure AfterInsert(const AContext: IioContext); override;
     // Update
     class procedure BeforeUpdate(const AContext: IioContext; var ADone: Boolean); override;
@@ -61,76 +65,54 @@ type
 implementation
 
 uses
-  iORM, DJSON, iORM.CommonTypes, iORM.Utilities, System.SysUtils,
-  iORM.ETM.Factory;
+  iORM, iORM.CommonTypes, iORM.SynchroStrategy.Interfaces, iORM.LiveBindings.BSPersistence;
 
 { TioEtmInterceptor }
 
-class procedure TioEtmInterceptor.AfterInsert(const AContext: IioContext);
+class procedure TioEtmInterceptor._CreateAndPersistNewTimeSlot_Internal(const AContext: IioContext);
 var
-  LEntityState: String;
   LTimeSlot: TioEtmCustomTimeSlot;
 begin
-  // Get the state (JSON) of the entity
-  LEntityState := dj.From(AContext.DataObject, TioEtmFactory.djParamsEngine).ToJson;
-  // Create the TimeSlot, persist it and finally free it
-  LTimeSlot := AContext.Map.GetTable.GetEtmTimeSlotClass.Create(etInsert, ctNoConflict, AContext.GetID, AContext.DataObject.ClassName, AContext.ObjVersion,
-    0, LEntityState, '');
-  try
-    io.PersistObject(LTimeSlot);
-  finally
-    LTimeSlot.Free;
+  if AContext.SynchroStrategy_CanPersistEtmTimeSlot then
+  begin
+    LTimeSlot := AContext.Map.GetTable.GetEtmTimeSlotClass.Create(AContext);
+    try
+      io._PersistObject(LTimeSlot, itRegular, BL_ETM_PERSIST_TIMESLOT); // Intent is itRegular for the TimeSlot class and not depending from AContext
+    finally
+      LTimeSlot.Free;
+    end;
   end;
+end;
+
+class procedure TioEtmInterceptor._SetEntityFromVersion(const AContext: IioContext);
+begin
+  // Save the before update ObjVersion of the object into the AContext (will use it in the constructor of TimeSlot class)
+  AContext.EntityFromVersion := Abs(AContext.ObjVersion);
+end;
+
+class procedure TioEtmInterceptor.BeforeInsert(const AContext: IioContext; var ADone: Boolean);
+begin
+  _SetEntityFromVersion(AContext);
 end;
 
 class procedure TioEtmInterceptor.BeforeUpdate(const AContext: IioContext; var ADone: Boolean);
-var
-  LPreviousStateObj: TObject;
 begin
-  // Gather the previous state of the entity (before update query)
-  { TODO : OTTIMIZZAZIONE: si potrebbe fare in modo che venga caricato solo l'ObjVersion senza caricare tutto l'oggetto }
-  LPreviousStateObj := io.Load(AContext.DataObject.ClassName).ByID(AContext.GetID).ToObject; // Load the previous version obj
-  try
-    // If the ObjVersion is negative it means that we are trying to restore a previous version
-    if AContext.ObjVersion < 0 then
-    begin
-      AContext.EtmRevertedFromVersion := Abs(AContext.ObjVersion);
-      AContext.ObjVersion := TioUtilities.ExtractObjVersion(LPreviousStateObj);
-    end;
-  finally
-    LPreviousStateObj.Free;
-  end;
+  _SetEntityFromVersion(AContext);
 end;
 
 class procedure TioEtmInterceptor.AfterUpdate(const AContext: IioContext);
-var
-  LEntityState: String;
-  LTimeSlot: TioEtmCustomTimeSlot;
 begin
-  // Get the state (JSON) of the entity
-  LEntityState := dj.From(AContext.DataObject, TioEtmFactory.djParamsEngine).ToJson;
-  // Create the TimeSlot, persist it and finally free it
-  LTimeSlot := AContext.Map.GetTable.GetEtmTimeSlotClass.Create(etUpdate, ctNoConflict, AContext.GetID, AContext.DataObject.ClassName, AContext.ObjVersion,
-    AContext.EtmRevertedFromVersion, LEntityState, '');
-  try
-    io.PersistObject(LTimeSlot);
-  finally
-    LTimeSlot.Free;
-  end;
+  _CreateAndPersistNewTimeSlot_Internal(AContext);
+end;
+
+class procedure TioEtmInterceptor.AfterInsert(const AContext: IioContext);
+begin
+  _CreateAndPersistNewTimeSlot_Internal(AContext);
 end;
 
 class procedure TioEtmInterceptor.AfterDelete(const AContext: IioContext);
-var
-  LTimeSlot: TioEtmCustomTimeSlot;
 begin
-  // Create the TimeSlot, persist it and finally free it (no entity state on delete)
-  LTimeSlot := AContext.Map.GetTable.GetEtmTimeSlotClass.Create(etDelete, ctNoConflict, AContext.GetID, AContext.DataObject.ClassName, AContext.ObjVersion,
-    0, '', '');
-  try
-    io.PersistObject(LTimeSlot);
-  finally
-    LTimeSlot.Free;
-  end;
+  _CreateAndPersistNewTimeSlot_Internal(AContext);
 end;
 
 end.

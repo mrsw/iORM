@@ -42,12 +42,12 @@ uses
   iORM.SqlItems,
   iORM.Context.Properties.Interfaces, iORM.Context.Table.Interfaces,
   System.Classes, iORM.Where.SqlItems.Interfaces,
-  iORM.Resolver.Interfaces, iORM.Containers.Interfaces, iORM.Where.Interfaces,
+  iORM.Resolver.Interfaces, iORM.Where.Interfaces,
   System.Generics.Collections, iORM.Where.Destinations,
   iORM.Context.Map.Interfaces, FireDAC.Comp.Client, System.TypInfo,
   iORM.Utilities, iORM.LiveBindings.CommonBSAPaging,
   iORM.Context.Interfaces, iORM.StdActions.Interfaces,
-  iORM.LiveBindings.Interfaces;
+  iORM.LiveBindings.Interfaces, DJSON.Attributes;
 
 type
 
@@ -55,6 +55,7 @@ type
   TioWhere = class(TioSqlItem, IioWhere, IioWhereInternal)
   strict protected
     FTypeName, FTypeAlias: String;
+    FIntent: TioPersistenceIntentType;
     FTypeInfo: PTypeInfo;
     FDisableStrictlyTrueClass: Boolean;
     FLazyLoad: Boolean;
@@ -63,7 +64,6 @@ type
     FOrderBy: IioSqlItemWhere;
     FClearListBefore: Boolean;
     FCacheable: Boolean;
-    FETMfor: IioBindSource;
     // Contiene le clausole where specificate fino ad ora
     FWhereItems: TWhereItems;
     // Contiene le eventuali clausole where di eventuali dettagli, la chiave è una stringa
@@ -77,6 +77,21 @@ type
     //        (dopo la deserializzazione lato server era in uno stato non ben definito)
     FPagingObj: TioCommonBSAPageManager;
     FPagingObjExists: Boolean;
+    // ETM related fields
+    //  NB: Dall'esterno viene impostato solo il campo "FETMfor" (BindSource) che però poi mi dava dei problemi con
+    //       la connessione http perchè non poteva essere serializzato in modo corretto visto che è un BindSource
+    //       che però serve a ricavare la classe e l'ID dell'oggetto corrente del BindSource puntato appunto da
+    //       "FETMFor" per ricavare la sua classe e il suo ID e poi impostare la condizione where (come testo) per filtrare
+    //       i TimeSlots dell'ETM.
+    //       Quindi per non andare a rifare tutto il discorso dell'ETM qui sull'oggetto where ho deciso di aggiungere
+    //       anche il campo "FETMFor_Sql", questo verrà valorizzato dal metodo "FillETM_Sql" prima
+    //       di essere usato per la creazione della query e, nel caso di una connessione http, prima della serializzazione
+    //       (nella HttpPersistenceStrategy) in modo che sia poi serializzato normalmente (è una stringa).
+    [djSkip]
+    FETMfor: IioBindSource;
+    FETMFor_Sql: String;
+    procedure ClearETM_Sql; inline;
+    procedure FillETM_Sql;  inline;
 
     procedure _Show(const ADataObject: TObject; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String; const AForceTypeNameUse: Boolean); overload;
     procedure _Show(const ADataObject: IInterface; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String; const AForceTypeNameUse: Boolean); overload;
@@ -127,10 +142,10 @@ type
     function ToMemTable: TFDMemTable; overload;
     procedure ToMemTable(const AMemTable: TFDMemTable); overload;
 
-    function _ToLazyObject(const AObj: TObject = nil): TObject; overload;
-    function _ToLazyObject(const AIntf: IInterface): TObject; overload;
+    function ToLazyObject(const AObj: TObject = nil): TObject; overload;
+    function ToLazyObject(const AIntf: IInterface): TObject; overload;
 
-    function _ToObjectInternalByClassOnly(const AObj: TObject = nil): TObject;
+    function _ToObjectInternalByClassOnly(const AIntent: TioPersistenceIntentType; const AObj: TObject = nil): TObject;
     function ToObject(const AObj: TObject = nil): TObject; overload;
     function ToObject(const AIntf: IInterface): TObject; overload;
 
@@ -143,6 +158,8 @@ type
     function Count: Integer;
     function Exists: Boolean;
     function IsEmpty: Boolean;
+    function Max(const APropertyName: String): Integer;
+    function Min(const APropertyName: String): Integer;
     function NotExists: Boolean;
 
     procedure Delete;
@@ -166,6 +183,7 @@ type
     function LimitExists: Boolean;
     function Cacheable: IioWhere;
     function IsCacheable: Boolean;
+    function Intent(const AIntent: TioPersistenceIntentType): IioWhere;
     // --------------------------------------------------------------
     // ------ Logic relations
     function _And: IioWhere; overload;
@@ -192,29 +210,46 @@ type
     function _IsNotNull: IioWhere;
     // ------ Compare operators with TValue
     function _EqualTo(AValue: TValue): IioWhere; overload;
+    function _EqualTo(AValue: TDate): IioWhere; overload;
     function _EqualTo(AValue: TDateTime): IioWhere; overload;
     function _EqualTo(AValue: Double): IioWhere; overload;
     function _EqualTo(AValue: Integer): IioWhere; overload;
+    function _EqualTo(AValue: Currency): IioWhere; overload;
+    function _In(Values: TArray<string>): IioWhere;  overload;
+    function _In(Values: TArray<Integer>): IioWhere;  overload;
+    function _In(Values: TArray<Double>): IioWhere;  overload;
+    function _In(Values: TArray<TDate>; const UseUTC: Boolean = True): IioWhere;  overload;
+    function _In(Values: TArray<TDateTime>; const UseUTC: Boolean = True): IioWhere;  overload;
     function _NotEqualTo(AValue: TValue): IioWhere; overload;
+    function _NotEqualTo(AValue: TDate): IioWhere; overload;
     function _NotEqualTo(AValue: TDateTime): IioWhere; overload;
     function _NotEqualTo(AValue: Double): IioWhere; overload;
     function _NotEqualTo(AValue: Integer): IioWhere; overload;
+    function _NotEqualTo(AValue: Currency): IioWhere; overload;
     function _GreaterThan(AValue: TValue): IioWhere; overload;
+    function _GreaterThan(AValue: TDate): IioWhere; overload;
     function _GreaterThan(AValue: TDateTime): IioWhere; overload;
     function _GreaterThan(AValue: Double): IioWhere; overload;
     function _GreaterThan(AValue: Integer): IioWhere; overload;
+    function _GreaterThan(AValue: Currency): IioWhere; overload;
     function _LowerThan(AValue: TValue): IioWhere; overload;
+    function _LowerThan(AValue: TDate): IioWhere; overload;
     function _LowerThan(AValue: TDateTime): IioWhere; overload;
     function _LowerThan(AValue: Double): IioWhere; overload;
     function _LowerThan(AValue: Integer): IioWhere; overload;
+    function _LowerThan(AValue: Currency): IioWhere; overload;
     function _GreaterOrEqualThan(AValue: TValue): IioWhere; overload;
+    function _GreaterOrEqualThan(AValue: TDate): IioWhere; overload;
     function _GreaterOrEqualThan(AValue: TDateTime): IioWhere; overload;
     function _GreaterOrEqualThan(AValue: Double): IioWhere; overload;
     function _GreaterOrEqualThan(AValue: Integer): IioWhere; overload;
+    function _GreaterOrEqualThan(AValue: Currency): IioWhere; overload;
     function _LowerOrEqualThan(AValue: TValue): IioWhere; overload;
+    function _LowerOrEqualThan(AValue: TDate): IioWhere; overload;
     function _LowerOrEqualThan(AValue: TDateTime): IioWhere; overload;
     function _LowerOrEqualThan(AValue: Double): IioWhere; overload;
     function _LowerOrEqualThan(AValue: Integer): IioWhere; overload;
+    function _LowerOrEqualThan(AValue: Currency): IioWhere; overload;
     function _LikeTo(AValue: TValue): IioWhere; overload;
     function _LikeTo(AValue: TDateTime): IioWhere; overload;
     function _LikeTo(AValue: Double): IioWhere; overload;
@@ -250,6 +285,8 @@ type
     function _PropertyEqualsTo(APropertyName: String; AValue: TDateTime): IioWhere; overload;
     function _PropertyEqualsTo(APropertyName: String; AValue: Double): IioWhere; overload;
     function _PropertyEqualsTo(APropertyName: String; AValue: Integer): IioWhere; overload;
+    function _PropertyIn(APropertyName: String; Values: TArray<TValue>): IioWhere; overload;
+    function _PropertyIn(APropertyName: String; Values: TArray<integer>): IioWhere; overload;
     function _PropertyIsNull(APropertyName: String): IioWhere;
     function _PropertyIsNotNull(APropertyName: String): IioWhere;
     function _PropertyOIDEqualsTo(AValue: Integer): IioWhere;
@@ -277,11 +314,9 @@ type
   TioWhere<T> = class(TioWhere, IioWhere<T>)
   public
     // ------ Destination methods
+    function ToLazyObject(const AObj: TObject = nil): T; reintroduce; overload;
     function ToObject(const AObj: TObject = nil): T; reintroduce; overload;
     function ToList: TList<T>; overload;
-    // function ToObjectList(const AOwnsObjects:Boolean=True): TObjectList<TObject>;
-    function ToInterfacedList: IioList<T>; overload;
-    // function ToInterfacedObjectList(const AOwnsObjects:Boolean=True): IioList<T>; overload;
     function ClearListBefore(const AClearListBefore: Boolean = True): IioWhere<T>;
 
     // procedure Show(const AVVMAlias:String=''; const AForceTypeNameUse:Boolean=False); override;
@@ -298,6 +333,7 @@ type
     function LazyProps(const ALazyProps: String): IioWhere<T>;
     function _Limit(const ARows: Integer; const AOffset: Integer = 0): IioWhere<T>;
     function Cacheable: IioWhere<T>;
+    function Intent(const AIntent: TioPersistenceIntentType): IioWhere<T>;
     // ------ Logic relations
     function _And: IioWhere<T>; overload;
     function _Or: IioWhere<T>; overload;
@@ -323,29 +359,46 @@ type
     function _IsNotNull: IioWhere<T>;
     // ------ Compare operators with TValue
     function _EqualTo(AValue: TValue): IioWhere<T>; overload;
+    function _EqualTo(AValue: TDate): IioWhere<T>; overload;
     function _EqualTo(AValue: TDateTime): IioWhere<T>; overload;
     function _EqualTo(AValue: Double): IioWhere<T>; overload;
     function _EqualTo(AValue: Integer): IioWhere<T>; overload;
+    function _EqualTo(AValue: Currency): IioWhere<T>; overload;
+    function _In(Values: TArray<string>): IioWhere<T>;  overload;
+    function _In(Values: TArray<Integer>): IioWhere<T>;  overload;
+    function _In(Values: TArray<Double>): IioWhere;  overload;
+    function _In(Values: TArray<TDate>; const UseUTC: Boolean = True): IioWhere<T>;  overload;
+    function _In(Values: TArray<TDateTime>; const UseUTC: Boolean = True): IioWhere<T>;  overload;
     function _NotEqualTo(AValue: TValue): IioWhere<T>; overload;
+    function _NotEqualTo(AValue: TDate): IioWhere<T>; overload;
     function _NotEqualTo(AValue: TDateTime): IioWhere<T>; overload;
     function _NotEqualTo(AValue: Double): IioWhere<T>; overload;
     function _NotEqualTo(AValue: Integer): IioWhere<T>; overload;
+    function _NotEqualTo(AValue: Currency): IioWhere<T>; overload;
     function _GreaterThan(AValue: TValue): IioWhere<T>; overload;
+    function _GreaterThan(AValue: TDate): IioWhere<T>; overload;
     function _GreaterThan(AValue: TDateTime): IioWhere<T>; overload;
     function _GreaterThan(AValue: Double): IioWhere<T>; overload;
     function _GreaterThan(AValue: Integer): IioWhere<T>; overload;
+    function _GreaterThan(AValue: Currency): IioWhere<T>; overload;
     function _LowerThan(AValue: TValue): IioWhere<T>; overload;
+    function _LowerThan(AValue: TDate): IioWhere<T>; overload;
     function _LowerThan(AValue: TDateTime): IioWhere<T>; overload;
     function _LowerThan(AValue: Double): IioWhere<T>; overload;
     function _LowerThan(AValue: Integer): IioWhere<T>; overload;
+    function _LowerThan(AValue: Currency): IioWhere<T>; overload;
     function _GreaterOrEqualThan(AValue: TValue): IioWhere<T>; overload;
+    function _GreaterOrEqualThan(AValue: TDate): IioWhere<T>; overload;
     function _GreaterOrEqualThan(AValue: TDateTime): IioWhere<T>; overload;
     function _GreaterOrEqualThan(AValue: Double): IioWhere<T>; overload;
     function _GreaterOrEqualThan(AValue: Integer): IioWhere<T>; overload;
+    function _GreaterOrEqualThan(AValue: Currency): IioWhere<T>; overload;
     function _LowerOrEqualThan(AValue: TValue): IioWhere<T>; overload;
+    function _LowerOrEqualThan(AValue: TDate): IioWhere<T>; overload;
     function _LowerOrEqualThan(AValue: TDateTime): IioWhere<T>; overload;
     function _LowerOrEqualThan(AValue: Double): IioWhere<T>; overload;
     function _LowerOrEqualThan(AValue: Integer): IioWhere<T>; overload;
+    function _LowerOrEqualThan(AValue: Currency): IioWhere<T>; overload;
     function _LikeTo(AValue: TValue): IioWhere<T>; overload;
     function _LikeTo(AValue: TDateTime): IioWhere<T>; overload;
     function _LikeTo(AValue: Double): IioWhere<T>; overload;
@@ -397,9 +450,10 @@ type
 implementation
 
 uses
+  System.DateUtils,
   iORM.DB.Factory, iORM.Context.Factory, System.SysUtils, iORM.DuckTyped.Interfaces, iORM.DuckTyped.Factory, iORM.ObjectsForge.Factory,
-  iORM.RttiContext.Factory, iORM, iORM.Where.SqlItems, iORM.DB.Interfaces, iORM.Resolver.Factory, iORM.Containers.Factory,
-  iORM.Where.Factory, iORM.Exceptions, FireDAC.Comp.DataSet, iORM.LazyLoad.Factory, iORM.Strategy.Factory, iORM.Containers.List,
+  iORM.RttiContext.Factory, iORM, iORM.Where.SqlItems, iORM.DB.Interfaces, iORM.Resolver.Factory,
+  iORM.Where.Factory, iORM.Exceptions, FireDAC.Comp.DataSet, iORM.LazyLoad.Factory, iORM.PersistenceStrategy.Factory,
   iORM.MVVM.Interfaces, iORM.Abstraction, iORM.Context.Container, System.StrUtils,
   iORM.ObjectsForge.Interfaces, iORM.ETM.Engine;
 
@@ -526,6 +580,11 @@ begin
   Result := Self._EqualTo(TValue.From<Integer>(AValue));
 end;
 
+function TioWhere._EqualTo(AValue: TDate): IioWhere;
+begin
+  Result := Self._EqualTo(TValue.From<TDate>(AValue));
+end;
+
 function TioWhere._EqualTo(AValue: TDateTime): IioWhere;
 begin
   Result := Self._EqualTo(TValue.From<TDateTime>(AValue));
@@ -555,6 +614,11 @@ begin
   Result := Self._GreaterOrEqualThan(TValue.From<Integer>(AValue));
 end;
 
+function TioWhere._GreaterOrEqualThan(AValue: TDate): IioWhere;
+begin
+  Result := Self._GreaterOrEqualThan(TValue.From<TDate>(AValue));
+end;
+
 function TioWhere._GreaterOrEqualThan(AValue: Double): IioWhere;
 begin
   Result := Self._GreaterOrEqualThan(TValue.From<Double>(AValue));
@@ -577,6 +641,96 @@ begin
   Result := Self;
   Self._Greater;
   Self._Value(AValue);
+end;
+
+function TioWhere._In(Values: TArray<Integer>): IioWhere;
+var
+  LValue: string;
+  LItemCount: Integer;
+  LElement: Integer;
+  LStrings: TStringList;
+  I: integer;
+begin
+  Result := Self;
+  Self.FWhereItems.Add(TioDbFactory.CompareOperator._In);
+
+  LStrings := TStringList.Create;
+
+  try
+    LItemCount := Length(Values);
+
+    for I := 0 to Pred(LItemCount) do
+    begin
+      LElement := Values[I];
+
+      LStrings.Add(LElement.ToString);
+    end;
+
+    LValue := LStrings.CommaText;
+  finally
+    LStrings.Free;
+  end;
+
+  Self._Value(LValue);
+end;
+
+function TioWhere._In(Values: TArray<string>): IioWhere;
+var
+  LValue: string;
+  LItemCount: Integer;
+  LStrings: TStringList;
+  I: integer;
+begin
+  Result := Self;
+  Self.FWhereItems.Add(TioDbFactory.CompareOperator._In);
+
+  LStrings := TStringList.Create;
+
+  try
+    LItemCount := Length(Values);
+
+    for I := 0 to Pred(LItemCount) do
+    begin
+      LStrings.Add(Values[I]);
+    end;
+
+    LValue := LStrings.CommaText;
+  finally
+    LStrings.Free;
+  end;
+
+  Self._Value(LValue);
+end;
+
+function TioWhere._In(Values: TArray<Double>): IioWhere;
+var
+  LValue: string;
+  LItemCount: Integer;
+  LElement: Double;
+  LStrings: TStringList;
+  I: integer;
+begin
+  Result := Self;
+  Self.FWhereItems.Add(TioDbFactory.CompareOperator._In);
+
+  LStrings := TStringList.Create;
+
+  try
+    LItemCount := Length(Values);
+
+    for I := 0 to Pred(LItemCount) do
+    begin
+      LElement := Values[I];
+
+      LStrings.Add(LElement.ToString);
+    end;
+
+    LValue := LStrings.CommaText;
+  finally
+    LStrings.Free;
+  end;
+
+  Self._Value(LValue);
 end;
 
 function TioWhere._IsNotNull: IioWhere;
@@ -621,6 +775,11 @@ begin
   Self.FWhereItems.Add(TioDbFactory.CompareOperator._LowerOrEqual);
 end;
 
+function TioWhere._LowerOrEqualThan(AValue: Currency): IioWhere;
+begin
+  Result := Self._LowerOrEqualThan(TValue.From<Currency>(AValue));
+end;
+
 function TioWhere._LowerOrEqualThan(AValue: Double): IioWhere;
 begin
   Result := Self._LowerOrEqualThan(TValue.From<Double>(AValue));
@@ -629,6 +788,11 @@ end;
 function TioWhere._LowerOrEqualThan(AValue: Integer): IioWhere;
 begin
   Result := Self._LowerOrEqualThan(TValue.From<Integer>(AValue));
+end;
+
+function TioWhere._LowerOrEqualThan(AValue: TDate): IioWhere;
+begin
+  Result := Self._LowerOrEqualThan(TValue.From<TDate>(AValue));
 end;
 
 function TioWhere._LowerOrEqualThan(AValue: TDateTime): IioWhere;
@@ -687,6 +851,18 @@ begin
   FWhereItems.Clear;
   if AClearWhereDetails then
     FDetailsContainer.Clear;
+  ClearETM_Sql;
+end;
+
+procedure TioWhere.ClearETM_Sql;
+begin
+  FETMFor_Sql := IO_STRING_NULL_VALUE;
+end;
+
+procedure TioWhere.FillETM_Sql;
+begin
+  if Assigned(FETMfor) and FETMfor.IsActive and Assigned(FETMfor.Current) then
+    FETMFor_Sql := TioEtmEngine._InternalBuildWhereTextFor(FETMfor.Current);
 end;
 
 function TioWhere.ClearListBefore(const AClearListBefore: Boolean = True): IioWhere;
@@ -698,6 +874,7 @@ end;
 constructor TioWhere.Create;
 begin
   TioApplication.CheckIfAbstractionLayerComponentExists;
+  FIntent := itRegular;
   FDisableStrictlyTrueClass := False;
   FLazyLoad := False;
   FLazyProps := '';
@@ -711,6 +888,7 @@ begin
   FClearListBefore := False;
   FCacheable := False;
   FETMfor := nil;
+  ClearETM_Sql;
 end;
 
 procedure TioWhere.CreateIndex(ACommaSepFieldList: String; const AIndexOrientation: TioIndexOrientation; const AUnique: Boolean);
@@ -744,7 +922,7 @@ begin
     for AResolvedTypeName in AResolvedTypeList do
     begin
       // Get the Context for the current ResolverTypeName
-      AContext := TioContextFactory.Context(AResolvedTypeName, Self, nil, nil, '', '');
+      AContext := TioContextFactory.Context(itRegular, AResolvedTypeName, Self, nil, nil, '', '', BL_DEFAULT);
       // Start transaction
       ATransactionCollection.StartTransaction(AContext.GetTable.GetConnectionDefName);
       // Load the current class data into the list
@@ -761,7 +939,7 @@ end;
 
 procedure TioWhere.Delete;
 begin
-  TioStrategyFactory.GetStrategy('').Delete(Self);
+  TioPersistenceStrategyFactory.GetStrategy('').Delete(Self);
 end;
 
 destructor TioWhere.Destroy;
@@ -802,7 +980,7 @@ begin
     for AResolvedTypeName in AResolvedTypeList do
     begin
       // Get the Context for the current ResolverTypeName
-      AContext := TioContextFactory.Context(AResolvedTypeName, Self, nil, nil, '', '');
+      AContext := TioContextFactory.Context(itRegular, AResolvedTypeName, Self, nil, nil, '', '', BL_DEFAULT);
       // Start transaction
       ATransactionCollection.StartTransaction(AContext.GetTable.GetConnectionDefName);
       // Load the current class data into the list
@@ -824,7 +1002,7 @@ end;
 
 function TioWhere.Count: Integer;
 begin
-  Result := TioStrategyFactory.GetStrategy('').Count(Self);
+  Result := TioPersistenceStrategyFactory.GetStrategy('').Count(Self);
 end;
 
 function TioWhere.GetClearListBefore: Boolean;
@@ -897,13 +1075,15 @@ var
 begin
   // NB: NO inherited
   Result := '';
-  if (FWhereItems.Count = 0) and not Assigned(FETMfor) then
+  if (FWhereItems.Count = 0) and (FETMFor_Sql = IO_STRING_NULL_VALUE) then
     Exit;
   if AddWhere then
     Result := 'WHERE ';
-  // ETMfor
-  if Assigned(FETMfor) and FETMfor.IsActive and Assigned(FETMfor.Current) then
-    Result := Result + TioEtmEngine._InternalBuildWhereTextFor(FETMfor.Current);
+  // ETMfor: NB: le due righe qui sotto erano il vecchio codice che dava problemi con la connessione http (vedi commento in dichiarazione variabili)
+//  if Assigned(FETMfor) and FETMfor.IsActive and Assigned(FETMfor.Current) then
+//    Result := Result + TioEtmEngine._InternalBuildWhereTextFor(FETMfor.Current);
+  if FETMFor_Sql <> IO_STRING_NULL_VALUE then
+    Result := Result + FETMFor_Sql;
   // Add current SqlItem
   for CurrSqlItem in FWhereItems do
   begin
@@ -959,6 +1139,12 @@ begin
   FPagingObjExists := Assigned(FPagingObj);
 end;
 
+function TioWhere.Intent(const AIntent: TioPersistenceIntentType): IioWhere;
+begin
+  Result := Self;
+  FIntent := AIntent;
+end;
+
 function TioWhere.IsCacheable: Boolean;
 begin
   Result := FCacheable;
@@ -1000,6 +1186,16 @@ begin
   Result := GetLimitRows > 0;
 end;
 
+function TioWhere.Max(const APropertyName: String): Integer;
+begin
+  Result := TioPersistenceStrategyFactory.GetStrategy('').Max(Self, APropertyName);
+end;
+
+function TioWhere.Min(const APropertyName: String): Integer;
+begin
+  Result := TioPersistenceStrategyFactory.GetStrategy('').Min(Self, APropertyName);
+end;
+
 function TioWhere.NotExists: Boolean;
 begin
   Result := Count = 0;
@@ -1009,7 +1205,7 @@ function TioWhere.SetDetailsContainer(ADetailsContainer: IioWhereDetailsContaine
 begin
   Result := Self;
   if not Assigned(ADetailsContainer) then
-    raise EioException.Create(Self.ClassName + '.SetDetailsContainer: The ADetailsContainer parameter is not valid.');
+    raise EioGenericException.Create(Self.ClassName + '.SetDetailsContainer: The ADetailsContainer parameter is not valid.');
   Self.FDetailsContainer := ADetailsContainer;
 end;
 
@@ -1094,10 +1290,10 @@ end;
 procedure TioWhere.ToList(const AList: TObject);
 begin
   if not Assigned(AList) then
-    raise EioException.Create(ClassName, 'ToList', '"AList" parameter not assigned');
+    raise EioGenericException.Create(ClassName, 'ToList', '"AList" parameter not assigned');
   if FClearListBefore then
     TioUtilities.ClearList(AList);
-  TioStrategyFactory.GetStrategy('').LoadList(Self, AList);
+  TioPersistenceStrategyFactory.GetStrategy('').LoadList(Self, AList, FIntent);
 end;
 
 function TioWhere.ToList(const AInterfacedListTypeName, AAlias: String; const AOwnsObjects: Boolean): TObject;
@@ -1126,12 +1322,12 @@ end;
 
 procedure TioWhere.ToMemTable(const AMemTable: TFDMemTable);
 begin
-  TioStrategyFactory.GetStrategy('').LoadDataSet(Self, AMemTable);
+  TioPersistenceStrategyFactory.GetStrategy('').LoadDataSet(Self, AMemTable);
 end;
 
 function TioWhere.ToObject(const AObj: TObject): TObject;
 begin
-  Result := TioStrategyFactory.GetStrategy('').LoadObject(Self, AObj);
+  Result := TioPersistenceStrategyFactory.GetStrategy('').LoadObject(Self, AObj, FIntent);
 end;
 
 function TioWhere.ToObject(const AIntf: IInterface): TObject;
@@ -1176,6 +1372,11 @@ function TioWhere._NotEqual: IioWhere;
 begin
   Result := Self;
   Self.FWhereItems.Add(TioDbFactory.CompareOperator._NotEqual);
+end;
+
+function TioWhere._NotEqualTo(AValue: TDate): IioWhere;
+begin
+  Result := Self._NotEqualTo(TValue.From<TDate>(AValue));
 end;
 
 function TioWhere._NotEqualTo(AValue: TDateTime): IioWhere;
@@ -1270,6 +1471,18 @@ begin
   Result := Self._PropertyEqualsTo(APropertyName, TValue.From<Integer>(AValue));
 end;
 
+function TioWhere._PropertyIn(APropertyName: String; Values: TArray<integer>): IioWhere;
+begin
+  Result := Self;
+  Self.FWhereItems.Add(TioDbFactory.WhereItemPropertyIn(APropertyName, Values));
+end;
+
+function TioWhere._PropertyIn(APropertyName: String; Values: TArray<TValue>): IioWhere;
+begin
+  Result := Self;
+  Self.FWhereItems.Add(TioDbFactory.WhereItemPropertyIn(APropertyName, Values));
+end;
+
 function TioWhere._PropertyIsNotNull(APropertyName: String): IioWhere;
 begin
   Result := Self;
@@ -1310,7 +1523,7 @@ end;
 procedure TioWhere._Show(const ADataObject: TObject; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String; const AForceTypeNameUse: Boolean);
 begin
   if not Assigned(ADataObject) then
-    raise EioException.Create(Self.ClassName, '_Show', 'ADataObject non assigned.');
+    raise EioGenericException.Create(Self.ClassName, '_Show', 'ADataObject non assigned.');
   // If specific View/ViewModel were found for the instance then use them...
   // NB: But only if AForceTypeNameUse = False
   if io.di.LocateViewFor(ADataObject, AVVMAlias).Exist // NB: Lasciare le due condizioni separate
@@ -1324,7 +1537,7 @@ begin
     then
       io.di.LocateViewVMFor(TypeName, AParentCloseQueryAction, AVVMAlias).SetBindSource(ADataObject).Show
     else
-      raise EioException.Create(Self.ClassName, '_Show',
+      raise EioGenericException.Create(Self.ClassName, '_Show',
         Format('No View/ViewModel were found for this instance (Object class = "%s"; TypeName = "%s"; AVVMAlias = "%s")',
         [ADataObject.ClassName, TypeName, AVVMAlias]));
 end;
@@ -1343,7 +1556,7 @@ end;
 procedure TioWhere._Show(const ADataObject: IInterface; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String; const AForceTypeNameUse: Boolean);
 begin
   if not Assigned(ADataObject) then
-    raise EioException.Create(Self.ClassName, '_Show', 'ADataObject non assigned.');
+    raise EioGenericException.Create(Self.ClassName, '_Show', 'ADataObject non assigned.');
   // If specific View/ViewModel were found for the instance then use them...
   // NB: But only if AForceTypeNameUse = False
   if io.di.LocateViewFor(ADataObject, AVVMAlias).Exist // NB: Lasciare le due condizioni separate
@@ -1357,31 +1570,31 @@ begin
     then
       io.di.LocateViewVMFor(TypeName, AParentCloseQueryAction, AVVMAlias).SetBindSource(ADataObject).Show
     else
-      raise EioException.Create(Self.ClassName, '_Show',
+      raise EioGenericException.Create(Self.ClassName, '_Show',
         Format('No View/ViewModel were found for this instance (Object class = "%s"; TypeName = "%s"; AVVMAlias = "%s")',
         [(ADataObject as TObject).ClassName, TypeName, AVVMAlias]));
 end;
 
-function TioWhere._ToLazyObject(const AObj: TObject): TObject;
+function TioWhere.ToLazyObject(const AObj: TObject): TObject;
 begin
   Result := TioLazyLoadFactory.LazyLoadObject(Self.TypeInfo, Self.TypeName, Self.TypeAlias, '', 0, Self) as TObject;
 end;
 
-function TioWhere._ToLazyObject(const AIntf: IInterface): TObject;
+function TioWhere.ToLazyObject(const AIntf: IInterface): TObject;
 begin
-  Result := _ToLazyObject(AIntf as TObject);
+  Result := ToLazyObject(AIntf as TObject);
 end;
 
-function TioWhere._ToObjectInternalByClassOnly(const AObj: TObject = nil): TObject;
+function TioWhere._ToObjectInternalByClassOnly(const AIntent: TioPersistenceIntentType; const AObj: TObject = nil): TObject;
 begin
-  Result := TioStrategyFactory.GetStrategy('').LoadObjectByClassOnly(Self, AObj);
+  Result := TioPersistenceStrategyFactory.GetStrategy('').LoadObjectByClassOnly(Self, AObj, AIntent);
 end;
 
 function TioWhere._Value(AValue: IInterface): IioWhere;
 var
   LID: Integer;
 begin
-  LID := TioUtilities.ExtractOID(AValue);
+  LID := TioUtilities.IntfToID(AValue);
   Result := Self._Value(TValue.From<Integer>(LID));
 end;
 
@@ -1532,6 +1745,12 @@ begin
   TioWhere(Self).DisableStrictlyTrueClass;
 end;
 
+function TioWhere<T>.Intent(const AIntent: TioPersistenceIntentType): IioWhere<T>;
+begin
+  Result := Self;
+  TioWhere(Self).Intent(AIntent);
+end;
+
 function TioWhere<T>.Lazy(const ALazyEnabled: Boolean): IioWhere<T>;
 begin
   Result := Self;
@@ -1556,32 +1775,10 @@ begin
   TioWhere(Self).SetDetailsContainer(ADetailsContainer);
 end;
 
-// procedure TioWhere<T>.Show(const AVVMAlias: String; const AForceTypeNameUse:Boolean);
-// var
-// LIntfInstance: IInterface;
-// LClassInstance: TObject;
-// begin
-// LClassInstance := TioWhere(Self).ToObject;
-// if TioRttiUtilities.IsAnInterface<T> then
-// begin
-// Supports(LClassInstance, IInterface, LIntfInstance);
-// _Show(LIntfInstance, AVVMAlias, AForceTypeNameUse);
-// end
-// else
-// _Show(LClassInstance, AVVMAlias, AForceTypeNameUse);
-// end;
-
-function TioWhere<T>.ToInterfacedList: IioList<T>;
+function TioWhere<T>.ToLazyObject(const AObj: TObject): T;
 begin
-  Result := TioContainersFactory.GetInterfacedList<T>;
-  Self.ToList(TObject(Result));
+  Result := TioUtilities.CastObjectToGeneric<T>(TioWhere(Self).ToLazyObject(AObj));
 end;
-
-// function TioWhere<T>.ToInterfacedObjectList(const AOwnsObjects:Boolean): IioList<T>;
-// begin
-// Result := TioContainersFactory.GetInterfacedObjectList<T>(AOwnsObjects);
-// Self.ToList(   TObject(Result)   );
-// end;
 
 function TioWhere<T>.ToList: TList<T>;
 begin
@@ -1593,12 +1790,6 @@ function TioWhere<T>.ToObject(const AObj: TObject): T;
 begin
   Result := TioUtilities.CastObjectToGeneric<T>(TioWhere(Self).ToObject(AObj));
 end;
-
-// function TioWhere<T>.ToObjectList(const AOwnsObjects: Boolean): TObjectList<TObject>;
-// begin
-// Result := TObjectList<T>.Create(AOwnsObjects);
-// Self.ToList(Result);
-// end;
 
 function TioWhere<T>._And(ATextCondition: String): IioWhere<T>;
 begin
@@ -1646,6 +1837,11 @@ begin
   Result := Self._EqualTo(TValue.From<Integer>(AValue));
 end;
 
+function TioWhere<T>._EqualTo(AValue: TDate): IioWhere<T>;
+begin
+  Result := Self._EqualTo(TValue.From<TDate>(AValue));
+end;
+
 function TioWhere<T>._EqualTo(AValue: TDateTime): IioWhere<T>;
 begin
   Result := Self._EqualTo(TValue.From<TDateTime>(AValue));
@@ -1684,6 +1880,36 @@ function TioWhere<T>._GreaterThan(AValue: TValue): IioWhere<T>;
 begin
   Result := Self;
   TioWhere(Self)._GreaterThan(AValue);
+end;
+
+function TioWhere<T>._In(Values: TArray<Integer>): IioWhere<T>;
+begin
+  Result := Self;
+  TioWhere(Self)._In(Values);
+end;
+
+function TioWhere<T>._In(Values: TArray<string>): IioWhere<T>;
+begin
+  Result := Self;
+  TioWhere(Self)._In(Values);
+end;
+
+function TioWhere<T>._In(Values: TArray<Double>): IioWhere;
+begin
+  Result := Self;
+  TioWhere(Self)._In(Values);
+end;
+
+function TioWhere<T>._In(Values: TArray<TDate>; const UseUTC: Boolean): IioWhere<T>;
+begin
+  Result := Self;
+  TioWhere(Self)._In(Values, UseUTC);
+end;
+
+function TioWhere<T>._In(Values: TArray<TDateTime>; const UseUTC: Boolean): IioWhere<T>;
+begin
+  Result := Self;
+  TioWhere(Self)._In(Values, UseUTC);
 end;
 
 function TioWhere<T>._IsNotNull: IioWhere<T>;
@@ -1737,6 +1963,11 @@ begin
   TioWhere(Self)._LowerOrEqual;
 end;
 
+function TioWhere<T>._LowerOrEqualThan(AValue: Currency): IioWhere<T>;
+begin
+
+end;
+
 function TioWhere<T>._LowerOrEqualThan(AValue: TDateTime): IioWhere<T>;
 begin
   Result := Self._LowerOrEqualThan(TValue.From<TDateTime>(AValue));
@@ -1769,6 +2000,11 @@ end;
 function TioWhere<T>._NotEqualTo(AValue: Integer): IioWhere<T>;
 begin
   Result := Self._NotEqualTo(TValue.From<Integer>(AValue));
+end;
+
+function TioWhere<T>._NotEqualTo(AValue: TDate): IioWhere<T>;
+begin
+  Result := Self._NotEqualTo(TValue.From<TDate>(AValue));
 end;
 
 function TioWhere<T>._NotLike: IioWhere<T>;
@@ -1955,6 +2191,11 @@ begin
   Result := Self._GreaterThan(TValue.From<Integer>(AValue));
 end;
 
+function TioWhere._GreaterThan(AValue: TDate): IioWhere;
+begin
+  Result := Self._GreaterThan(TValue.From<TDate>(AValue));
+end;
+
 function TioWhere._GreaterThan(AValue: Double): IioWhere;
 begin
   Result := Self._GreaterThan(TValue.From<Double>(AValue));
@@ -1978,6 +2219,11 @@ end;
 function TioWhere._LowerThan(AValue: Integer): IioWhere;
 begin
   Result := Self._LowerThan(TValue.From<Integer>(AValue));
+end;
+
+function TioWhere._LowerThan(AValue: TDate): IioWhere;
+begin
+  Result := Self._LowerThan(TValue.From<TDate>(AValue));
 end;
 
 function TioWhere._NotEqualTo(AValue: Integer): IioWhere;
@@ -2023,6 +2269,16 @@ begin
   Result := Self._GreaterOrEqualThan(TValue.From<Integer>(AValue));
 end;
 
+function TioWhere<T>._GreaterThan(AValue: TDate): IioWhere<T>;
+begin
+  Result := Self._GreaterThan(TValue.From<TDate>(AValue));
+end;
+
+function TioWhere<T>._GreaterOrEqualThan(AValue: TDate): IioWhere<T>;
+begin
+  Result := Self._GreaterOrEqualThan(TValue.From<TDate>(AValue));
+end;
+
 function TioWhere<T>._GreaterOrEqualThan(AValue: Double): IioWhere<T>;
 begin
   Result := Self._GreaterOrEqualThan(TValue.From<Double>(AValue));
@@ -2048,6 +2304,11 @@ begin
   Result := Self._LowerOrEqualThan(TValue.From<Integer>(AValue));
 end;
 
+function TioWhere<T>._LowerOrEqualThan(AValue: TDate): IioWhere<T>;
+begin
+  Result := Self._LowerOrEqualThan(TValue.From<TDate>(AValue));
+end;
+
 function TioWhere<T>._LowerThan(AValue: Double): IioWhere<T>;
 begin
   Result := Self._LowerThan(TValue.From<Double>(AValue));
@@ -2056,6 +2317,11 @@ end;
 function TioWhere<T>._LowerThan(AValue: Integer): IioWhere<T>;
 begin
   Result := Self._LowerThan(TValue.From<Integer>(AValue));
+end;
+
+function TioWhere<T>._LowerThan(AValue: TDate): IioWhere<T>;
+begin
+  Result := Self._LowerThan(TValue.From<TDate>(AValue));
 end;
 
 function TioWhere<T>._PropertyEqualsTo(APropertyName: String; AValue: Double): IioWhere<T>;
@@ -2084,7 +2350,7 @@ function TioWhere._Value(AValue: TObject): IioWhere;
 var
   LID: Integer;
 begin
-  LID := TioUtilities.ExtractOID(AValue);
+  LID := TioUtilities.ObjToID(AValue);
   Result := Self._Value(TValue.From<Integer>(LID));
 end;
 
@@ -2170,6 +2436,125 @@ function TioWhere<T>._Not(const APropertyName: String; const ACompareOp: TioComp
 begin
   Result := Self;
   TioWhere(Self)._Not(APropertyName, ACompareOp);
+end;
+
+function TioWhere._In(Values: TArray<TDateTime>; const UseUTC: Boolean): IioWhere;
+var
+  LValue: string;
+  LItemCount: Integer;
+  LElement: TDateTime;
+  LStrings: TStringList;
+  I: integer;
+begin
+  Result := Self;
+  Self.FWhereItems.Add(TioDbFactory.CompareOperator._In);
+
+  LStrings := TStringList.Create;
+
+  try
+    LItemCount := Length(Values);
+
+    for I := 0 to Pred(LItemCount) do
+    begin
+      LElement := Values[I];
+
+      // Format to iso8601
+      LStrings.Add(DateToISO8601(LElement, UseUTC).QuotedString(''''));
+    end;
+
+    LValue := LStrings.CommaText;
+  finally
+    LStrings.Free;
+  end;
+
+  Self._Value(LValue);
+end;
+
+function TioWhere._In(Values: TArray<TDate>; const UseUTC: Boolean): IioWhere;
+var
+  LValue: string;
+  LItemCount: Integer;
+  LElement: TDate;
+  LStrings: TStringList;
+  I: integer;
+begin
+  Result := Self;
+  Self.FWhereItems.Add(TioDbFactory.CompareOperator._In);
+
+  LStrings := TStringList.Create;
+
+  try
+    LItemCount := Length(Values);
+
+    for I := 0 to Pred(LItemCount) do
+    begin
+      LElement := Values[I];
+
+      // Format to iso8601
+      LStrings.Add(DateToISO8601(LElement, UseUTC).QuotedString(''''));
+    end;
+
+    LValue := LStrings.CommaText;
+  finally
+    LStrings.Free;
+  end;
+
+  Self._Value(LValue);
+end;
+
+function TioWhere<T>._EqualTo(AValue: Currency): IioWhere<T>;
+begin
+  Result := Self;
+  TioWhere(Self)._EqualTo(AValue);
+end;
+
+function TioWhere<T>._GreaterOrEqualThan(AValue: Currency): IioWhere<T>;
+begin
+  Result := Self;
+  TioWhere(Self)._GreaterOrEqualThan(AValue);
+end;
+
+function TioWhere<T>._GreaterThan(AValue: Currency): IioWhere<T>;
+begin
+  Result := Self;
+  TioWhere(Self)._GreaterThan(AValue);
+end;
+
+function TioWhere<T>._LowerThan(AValue: Currency): IioWhere<T>;
+begin
+  Result := Self;
+  TioWhere(Self)._LowerThan(AValue);
+end;
+
+function TioWhere<T>._NotEqualTo(AValue: Currency): IioWhere<T>;
+begin
+  Result := Self;
+  TioWhere(Self)._NotEqualTo(AValue);
+end;
+
+function TioWhere._EqualTo(AValue: Currency): IioWhere;
+begin
+  Result := Self._EqualTo(TValue.From<Currency>(AValue));
+end;
+
+function TioWhere._GreaterOrEqualThan(AValue: Currency): IioWhere;
+begin
+  Result := Self._GreaterOrEqualThan(TValue.From<Currency>(AValue));
+end;
+
+function TioWhere._GreaterThan(AValue: Currency): IioWhere;
+begin
+  Result := Self._GreaterThan(TValue.From<Currency>(AValue));
+end;
+
+function TioWhere._LowerThan(AValue: Currency): IioWhere;
+begin
+  Result := Self._LowerThan(TValue.From<Currency>(AValue));
+end;
+
+function TioWhere._NotEqualTo(AValue: Currency): IioWhere;
+begin
+  Result := Self._NotEqualTo(TValue.From<Currency>(AValue));
 end;
 
 end.

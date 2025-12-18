@@ -57,9 +57,21 @@ uses
 type
   TioUniGUI = class(TComponent)
   strict private
+    // Events
+    FHideWait: TNotifyEvent;
+    FShowWait: TNotifyEvent;
+    // Methods
     function Get_Version: String;
+    procedure SetHideWait(const Value: TNotifyEvent);
+    procedure SetShowWait(const Value: TNotifyEvent);
+  public
+    constructor Create(AOwner: TComponent); override;
   published
+    // properties
     property _Version: String read Get_Version;
+    // Events
+    property HideWait: TNotifyEvent read FHideWait write SetHideWait;
+    property ShowWait: TNotifyEvent read FShowWait write SetShowWait;
   end;
 
   // Note: TioApplication features not implemented for uniGUI platform
@@ -134,20 +146,54 @@ type
 implementation
 
 uses
-  iORM, Vcl.Forms, Vcl.Dialogs, iORM.Exceptions, Vcl.Controls;
+  iORM, Vcl.Forms, Vcl.Dialogs, iORM.Exceptions, Vcl.Controls,
+  iORM.DB.ConnectionContainer;
 
 { TioUniGUI }
+
+constructor TioUniGUI.Create(AOwner: TComponent);
+begin
+  inherited;
+  FShowWait := nil;
+  FHideWait := nil;
+end;
 
 function TioUniGUI.Get_Version: String;
 begin
   Result := io.Version;
 end;
 
+procedure TioUniGUI.SetHideWait(const Value: TNotifyEvent);
+begin
+  FHideWait := Value;
+  if Assigned(FHideWait) then
+    TioConnectionManager.SetHideWaitProc(
+      procedure
+      begin
+        FHideWait(Self);
+      end)
+  else
+    TioConnectionManager.SetHideWaitProc(nil);
+end;
+
+procedure TioUniGUI.SetShowWait(const Value: TNotifyEvent);
+begin
+  FShowWait := Value;
+  if Assigned(FShowWait) then
+    TioConnectionManager.SetShowWaitProc(
+      procedure
+      begin
+        FShowWait(Self);
+      end)
+  else
+    TioConnectionManager.SetShowWaitProc(nil);
+end;
+
 { TioApplicationUniGUI }
 
 class procedure TioApplicationUniGUI._HandleException(const Sender: TObject);
 begin
-  raise EioException.Create(ClassName, '_HandleException', 'Feature not implemented for then uniGUI platform.');
+  raise EioGenericException.Create(ClassName, '_HandleException', 'Feature not implemented for then uniGUI platform.');
 end;
 
 class function TioApplicationUniGUI._ProjectPlatform: TioProjectPlatform;
@@ -157,12 +203,12 @@ end;
 
 class procedure TioApplicationUniGUI._ShowMessage(const AMessage: string);
 begin
-  raise EioException.Create(ClassName, '_HandleException', 'Feature not implemented for then uniGUI platform.');
+  raise EioGenericException.Create(ClassName, '_HandleException', 'Feature not implemented for then uniGUI platform.');
 end;
 
 class function TioApplicationUniGUI._Terminate: Boolean;
 begin
-  raise EioException.Create(ClassName, '_Terminate', 'Feature not implemented for then uniGUI platform.');
+  raise EioGenericException.Create(ClassName, '_Terminate', 'Feature not implemented for then uniGUI platform.');
 end;
 
 { TioControlUniGUI }
@@ -171,9 +217,9 @@ class procedure TioControlUniGUI._SetParent(const AControl, AParent: TObject);
 begin
   inherited;
   if not(AControl is TControl) then
-    raise EioException.Create(Self.ClassName, '_SetParent', 'AControl must descend from TControl.');
+    raise EioGenericException.Create(Self.ClassName, '_SetParent', 'AControl must descend from TControl.');
   if not(AParent is TWinControl) then
-    raise EioException.Create(Self.ClassName, '_SetParent', 'AParent must descend from TWinControl.');
+    raise EioGenericException.Create(Self.ClassName, '_SetParent', 'AParent must descend from TWinControl.');
   TControl(AControl).Parent := TWinControl(AParent);
 end;
 
@@ -181,7 +227,7 @@ class procedure TioControlUniGUI._SetVisible(const AControl: TObject; const AVis
 begin
   inherited;
   if not(AControl is TControl) then
-    raise EioException.Create(Self.ClassName, '_SetParent', 'AControl must descend from TControl.');
+    raise EioGenericException.Create(Self.ClassName, '_SetParent', 'AControl must descend from TControl.');
   TControl(AControl).Visible := AVisible;
 end;
 
@@ -189,9 +235,10 @@ end;
 
 constructor TioTimerUniGUI.Create;
 begin
-  raise EioException.Create(ClassName, 'Create', 'Feature not implemented for then uniGUI platform.');
+  raise EioGenericException.Create(ClassName, 'Create', 'Feature not implemented for then uniGUI platform.');
   // inherited;
   // FInternalTimer := TUniTimer.Create(UniApplication);
+  // FInternalTimer.Enabled := False;
   // FInternalTimer.ChainMode := True;
 end;
 

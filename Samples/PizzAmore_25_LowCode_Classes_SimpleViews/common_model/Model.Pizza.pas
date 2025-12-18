@@ -10,19 +10,21 @@ uses
 {$ELSE}
   Vcl.Graphics,
 {$IFEND}
-  iORM, ETM.Repository;
+  iORM, ETM.Repository, System.Generics.Collections, Model.Pizza.IngredientRow;
 
 type
 
-  [ioEntity('PIZZAS'), etmTrace(TEtmRepository)]
+  [ioEntity('PIZZAS'), etmTrace(TEtmRepository), ioConflictStrategy(TioSameVersionWin, csResolved)]
   TPizza = class
   private
     FID: Integer;
+    [ioIndex(TioIndexOrientation.ioAscending)]
     FName: String;
+    FObjVersion: TioObjVersion; // The ObjVersion is mandatory if you want to use the ETM
     FPrice: Currency;
+    FIngredients: TObjectList<TPizzaIngredientRow>;
     [ioSkip([ssETM])]
     FImage: TBitmap;
-    FObjVersion: TioObjVersion; // The ObjVersion is mandatory if you want to use the ETM
   public
     constructor Create;
     destructor Destroy; override;
@@ -30,6 +32,7 @@ type
     property Name: String read FName write FName;
     property Price: Currency read FPrice write FPrice;
     property Image: TBitmap read FImage; // ReadOnly
+    property Ingredients: TObjectList<TPizzaIngredientRow> read FIngredients;
   end;
 
 implementation
@@ -40,11 +43,13 @@ constructor TPizza.Create;
 begin
   inherited;
   FImage := TBitmap.Create;
+  FIngredients := TObjectList<TPizzaIngredientRow>.Create;
 end;
 
 destructor TPizza.Destroy;
 begin
   FImage.Free;
+  FIngredients.Free;
   inherited;
 end;
 

@@ -47,7 +47,8 @@ type
     FAsDefault: Boolean;
     FBindSourceAdapter: IioActiveBindSourceAdapter;
     FTypeName, FTypeAlias: String;
-    FAsync: Boolean;
+    FAsyncLoad: Boolean;
+    FAsyncPersist: Boolean;
     FLoadType: TioLoadType;
     FLazy: Boolean;
     FLazyProps: String;
@@ -92,6 +93,10 @@ type
     FBeforeSelectionInterface: TioBSABeforeAfterSelectionInterfaceEvent;
     FonSelectionInterface: TioBSASelectionInterfaceEvent;
     FAfterSelectionInterface: TioBSABeforeAfterSelectionInterfaceEvent;
+    // Persistence conflict events
+    FOnDeleteConflictException: TioBSOnPersistenceConflictExceptionEvent;
+    FOnInsertConflictException: TioBSOnPersistenceConflictExceptionEvent;
+    FOnUpdateConflictException: TioBSOnPersistenceConflictExceptionEvent;
     // Events
     FAfterClose: TNotifyEvent;
     FAfterOpen: TNotifyEvent;
@@ -106,8 +111,10 @@ type
     function GetAsDefault: Boolean;
     procedure SetAsDefault(const Value: Boolean);
     procedure InitAsDefaultOnCreate;
-    // Async
-    procedure SetAsync(const Value: Boolean);
+    // AsyncLoad
+    procedure SetAsyncLoad(const Value: Boolean);
+    // AsyncPersist
+    procedure SetAsyncPersist(const Value: Boolean);
     // Lazy
     procedure SetLazy(const Value: Boolean);
     // LazyProps
@@ -171,6 +178,13 @@ type
     // SelectorFor
     function GetSelectorFor: IioBindSource;
     procedure SetSelectorFor(const ATargetBindSource: IioBindSource);
+    // Persistence concurrency conflicts
+    function GetOnDeleteConflictException: TioBSOnPersistenceConflictExceptionEvent;
+    function GetOnInsertConflictException: TioBSOnPersistenceConflictExceptionEvent;
+    function GetOnUpdateConflictException: TioBSOnPersistenceConflictExceptionEvent;
+    procedure SetOnDeleteConflictException(const APersistenceConflictEventHandler: TioBSOnPersistenceConflictExceptionEvent);
+    procedure SetOnInsertConflictException(const APersistenceConflictEventHandler: TioBSOnPersistenceConflictExceptionEvent);
+    procedure SetOnUpdateConflictException(const APersistenceConflictEventHandler: TioBSOnPersistenceConflictExceptionEvent);
   protected
     procedure _CreateAdapter(const ADataObject: TObject; const AOwnsObject: Boolean); virtual;
     procedure Open; virtual;
@@ -206,7 +220,8 @@ type
     property Bof: Boolean read GetBOF; // Public: Master+Detail
     property Eof: Boolean read GetEOF; // Public: Master+Detail
     // Published properties
-    property Async: Boolean read FAsync write SetAsync default False; // Published: Master
+    property AsyncLoad: Boolean read FAsyncLoad write SetAsyncLoad default False; // Published: Master
+    property AsyncPersist: Boolean read FAsyncPersist write SetAsyncPersist default False; // Published: Master
     property LoadType: TioLoadType read GetLoadType write SetLoadType default ltManual; // Published: Master
     property Lazy: Boolean read FLazy write SetLazy default False; // published: Master
     property LazyProps: String read FLazyProps write SetLazyProps; // published: Master
@@ -234,6 +249,10 @@ type
     property BeforeSelectionInterface: TioBSABeforeAfterSelectionInterfaceEvent read FBeforeSelectionInterface write FBeforeSelectionInterface;
     property OnSelectionInterface: TioBSASelectionInterfaceEvent read FonSelectionInterface write FonSelectionInterface;
     property AfterSelectionInterface: TioBSABeforeAfterSelectionInterfaceEvent read FAfterSelectionInterface write FAfterSelectionInterface;
+    // Published Events: persistence concurrency conflicts
+    property OnDeleteConflictException: TioBSOnPersistenceConflictExceptionEvent read GetOnDeleteConflictException write SetOnDeleteConflictException;
+    property OnInsertConflictException: TioBSOnPersistenceConflictExceptionEvent read GetOnInsertConflictException write SetOnInsertConflictException;
+    property OnUpdateConflictException: TioBSOnPersistenceConflictExceptionEvent read GetOnUpdateConflictException write SetOnUpdateConflictException;
     // published events
     property AfterClose: TNotifyEvent read FAfterClose write FAfterClose;
     property AfterOpen: TNotifyEvent read FAfterOpen write FAfterOpen;
@@ -416,7 +435,8 @@ begin
   inherited;
   FAutoPost := True;
   FAutoRefreshOnNotification := True;
-  FAsync := False;
+  FAsyncLoad := False;
+  FAsyncPersist := False;
   FLoadType := ltManual;
   FLazy := False;
   FLazyProps := '';
@@ -732,6 +752,16 @@ begin
   Result := Name;
 end;
 
+function TioModelPresenterCustom.GetOnDeleteConflictException: TioBSOnPersistenceConflictExceptionEvent;
+begin
+  Result := FOnDeleteConflictException;
+end;
+
+function TioModelPresenterCustom.GetOnInsertConflictException: TioBSOnPersistenceConflictExceptionEvent;
+begin
+  Result := FOnInsertConflictException;
+end;
+
 function TioModelPresenterCustom.GetOnReceiveSelectionCloneObject: Boolean;
 begin
   Result := FOnReceiveSelectionCloneObject;
@@ -740,6 +770,11 @@ end;
 function TioModelPresenterCustom.GetOnReceiveSelectionFreeObject: Boolean;
 begin
   Result := FOnReceiveSelectionFreeObject;
+end;
+
+function TioModelPresenterCustom.GetOnUpdateConflictException: TioBSOnPersistenceConflictExceptionEvent;
+begin
+  Result := FOnUpdateConflictException;
 end;
 
 function TioModelPresenterCustom.GetPaging: TioCommonBSAPageManager;
@@ -972,8 +1007,11 @@ end;
 
 procedure TioModelPresenterCustom.UnregisterDetailBindSource(const ADetailBindSource: IioBindSource);
 begin
+//  if not Assigned(FDetailBindSourceContainer) then
+//    FDetailBindSourceContainer := TList<IioBindSource>.Create;
   if not Assigned(FDetailBindSourceContainer) then
-    FDetailBindSourceContainer := TList<IioBindSource>.Create;
+  	exit;
+
   if not FDetailBindSourceContainer.Contains(ADetailBindSource) then
     FDetailBindSourceContainer.Remove(ADetailBindSource);
 end;
@@ -981,7 +1019,7 @@ end;
 procedure TioModelPresenterCustom.RegisterViewBindSource(const AModelBindSourceOrModelDataSet: IInterface);
 begin
   if not Supports(AModelBindSourceOrModelDataSet, IioVMBridgeClientComponent) then
-    raise EioException.Create(Self.ClassName, 'RegisterVewBindSource',
+    raise EioGenericException.Create(Self.ClassName, 'RegisterVewBindSource',
       '"AModelBindSourceOrModelDataSet" parameter must be a "IioVMBridgeClientComponent" implementer');
   if not FViewBindSourceContainer.Contains(AModelBindSourceOrModelDataSet) then
   begin
@@ -1046,13 +1084,22 @@ begin
   FAsDefault := Value;
 end;
 
-procedure TioModelPresenterCustom.SetAsync(const Value: Boolean);
+procedure TioModelPresenterCustom.SetAsyncLoad(const Value: Boolean);
 begin
-  FAsync := Value;
+  FAsyncLoad := Value;
   // If the adapter is created and is an ActiveBindSourceAdapter then
   // update the where of the adapter also
   if CheckAdapter then
-    FBindSourceAdapter.ioAsync := Value;
+    FBindSourceAdapter.AsyncLoad := Value;
+end;
+
+procedure TioModelPresenterCustom.SetAsyncPersist(const Value: Boolean);
+begin
+  FAsyncPersist := Value;
+  // If the adapter is created and is an ActiveBindSourceAdapter then
+  // update the where of the adapter also
+  if CheckAdapter then
+    FBindSourceAdapter.AsyncPersist := Value;
 end;
 
 procedure TioModelPresenterCustom.SetLazy(const Value: Boolean);
@@ -1086,7 +1133,8 @@ begin
     Exit;
   FBindSourceAdapter := Value;
   // Set some properties
-  FBindSourceAdapter.ioAsync := FAsync;
+  FBindSourceAdapter.AsyncLoad := FAsyncLoad;
+  FBindSourceAdapter.AsyncPersist := FAsyncPersist;
   FBindSourceAdapter.ioWhereDetailsFromDetailAdapters := FWhereDetailsFromDetailAdapters;
   FBindSourceAdapter.ioWhere := GetWhere; // Do not directly access to the FWhere field here
   FBindSourceAdapter.LoadType := FLoadType;
@@ -1278,7 +1326,7 @@ begin
   if CheckAdapter then
     FBindSourceAdapter.ItemIndex := Value
   else
-    raise EioException.Create(Self.ClassName, 'SetItemindex', 'Unassigned BindSourceAdapter');
+    raise EioGenericException.Create(Self.ClassName, 'SetItemindex', 'Unassigned BindSourceAdapter');
 end;
 
 procedure TioModelPresenterCustom.SetMasterBindSource(const Value: IioBindSource);
@@ -1291,6 +1339,16 @@ begin
   FMasterPropertyName := Trim(Value);
 end;
 
+procedure TioModelPresenterCustom.SetOnDeleteConflictException(const APersistenceConflictEventHandler: TioBSOnPersistenceConflictExceptionEvent);
+begin
+  FOnDeleteConflictException := APersistenceConflictEventHandler;
+end;
+
+procedure TioModelPresenterCustom.SetOnInsertConflictException(const APersistenceConflictEventHandler: TioBSOnPersistenceConflictExceptionEvent);
+begin
+  FOnInsertConflictException := APersistenceConflictEventHandler;
+end;
+
 procedure TioModelPresenterCustom.SetOnReceiveSelectionCloneObject(const Value: Boolean);
 begin
   FOnReceiveSelectionCloneObject := Value;
@@ -1299,6 +1357,11 @@ end;
 procedure TioModelPresenterCustom.SetOnReceiveSelectionFreeObject(const Value: Boolean);
 begin
   FOnReceiveSelectionFreeObject := Value;
+end;
+
+procedure TioModelPresenterCustom.SetOnUpdateConflictException(const APersistenceConflictEventHandler: TioBSOnPersistenceConflictExceptionEvent);
+begin
+  FOnUpdateConflictException := APersistenceConflictEventHandler;
 end;
 
 procedure TioModelPresenterCustom.SetOrderBy(const Value: String);
@@ -1320,7 +1383,7 @@ begin
   // then it no longer writes me the values of the sub-properties in the DFM file.
   // So I also put the set method where, however, I raise an exception if someone
   // tries to set a value.
-  raise EioException.Create(ClassName, 'SetPaging', 'This property "Paging" is not writable');
+  raise EioGenericException.Create(ClassName, 'SetPaging', 'This property "Paging" is not writable');
 end;
 
 procedure TioModelPresenterCustom.SetSelectorFor(const ATargetBindSource: IioBindSource);
@@ -1334,7 +1397,7 @@ begin
   // If the adapter is created and is an ActiveBindSourceAdapter then
   // update the where of the adapter also
   if CheckAdapter then
-    FBindSourceAdapter.ioTypeAlias := Value;
+    FBindSourceAdapter.TypeAlias := Value;
 end;
 
 procedure TioModelPresenterCustom.SetTypeName(const Value: String);
@@ -1343,7 +1406,7 @@ begin
   // If the adapter is created and is an ActiveBindSourceAdapter then
   // update the where of the adapter also
   if CheckAdapter then
-    FBindSourceAdapter.ioTypeName := Value;
+    FBindSourceAdapter.TypeName := Value;
 end;
 
 procedure TioModelPresenterCustom.SetTypeOfCollection(const Value: TioTypeOfCollection);
@@ -1427,7 +1490,7 @@ end;
 procedure TioModelPresenterCustom.UnregisterViewBindSource(const AModelBindSourceOrModelDataSet: IInterface);
 begin
   if not Supports(AModelBindSourceOrModelDataSet, IioVMBridgeClientComponent) then
-    raise EioException.Create(Self.ClassName, 'RegisterVewBindSource',
+    raise EioGenericException.Create(Self.ClassName, 'RegisterVewBindSource',
       '"AModelBindSourceOrModelDataSet" parameter must be a "IioVMBridgeClientComponent" implementer');
   if FViewBindSourceContainer.Contains(AModelBindSourceOrModelDataSet) then
   begin
@@ -1454,7 +1517,7 @@ procedure TioModelPresenterCustom._CreateAdapter(const ADataObject: TObject; con
 begin
   // If an adapter already exists then raise an exception
   if Assigned(FBindSourceAdapter) then
-    raise EioException.Create(ClassName, '_CreateAdapter', Format('ActiveBindSourceAdapter already exists in component "%s".', [Name]));
+    raise EioGenericException.Create(ClassName, '_CreateAdapter', Format('ActiveBindSourceAdapter already exists in component "%s".', [Name]));
 
   // If it is a detail bind source then get the detail BSA from the master bind source,
   // else if it is a master bind source but load type property is set to ltFromBSAsIs, ltFromBSReload or ltFromBSReloadNewInstance
@@ -1518,18 +1581,18 @@ begin
   // Check the ModelPresenter
   Result := Result and Assigned(AModelPresenter);
   if ARaiseExceptions and not Result then
-    raise EioException.Create(Self.ClassName, 'IsValidForDependencyInjectionLocator', 'Parameter "AModelPresenter" not assigned.');
+    raise EioGenericException.Create(Self.ClassName, 'IsValidForDependencyInjectionLocator', 'Parameter "AModelPresenter" not assigned.');
   // Check the bind source adapter
   Result := Result and AModelPresenter.CheckAdapter;
   if ARaiseExceptions and not Result then
-    raise EioException.Create(Self.ClassName, 'IsValidForDependencyInjectionLocator',
+    raise EioGenericException.Create(Self.ClassName, 'IsValidForDependencyInjectionLocator',
       'ActiveBindSourceAdapter not assigned in the "AModelPresenter" parameter.');
   // Check the ModelPresenter.Current object
   if not ACheckCurrentObj then
     Exit;
   Result := Result and (AModelPresenter.Current <> nil);
   if ARaiseExceptions and not Result then
-    raise EioException.Create(Self.ClassName, 'IsValidForDependencyInjectionLocator', '"Current" object of the ModelPresenter not assigned.');
+    raise EioGenericException.Create(Self.ClassName, 'IsValidForDependencyInjectionLocator', '"Current" object of the ModelPresenter not assigned.');
 end;
 
 end.

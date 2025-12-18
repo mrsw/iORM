@@ -36,19 +36,42 @@ unit iORM;
 interface
 
 uses
-  System.Classes, System.SysUtils, System.TypInfo, DJSON, iORM.CommonTypes, iORM.Where.Interfaces, iORM.Attributes, iORM.LiveBindings.BSPersistence,
+  System.Classes, System.SysUtils, System.TypInfo, System.Generics.Collections, DJSON,
+  iORM.CommonTypes, iORM.Where.Interfaces, iORM.Attributes, iORM.LiveBindings.BSPersistence,
   iORM.DB.ConnectionContainer, iORM.DB.Interfaces, iORM.DBBuilder.Interfaces, iORM.DependencyInjection, iORM.Global.Factory,
   iORM.DependencyInjection.Interfaces, iORM.MVVM.ViewContextProvider, iORM.MVVM.Interfaces, iORM.MVVM.ModelPresenter.Custom,
   iORM.LiveBindings.Interfaces, iORM.MVVM.ViewRegister,
   iORM.StdActions.Interfaces, iORM.Context.Container,
   iORM.Context.Properties.Interfaces, iORM.Where.SmartBuilder,
   iORM.Interceptor.Strategy.Register, iORM.Interceptor.CRUD.Register,
-  iORM.ETM.Engine, iORM.ETM.Interfaces, DJSON.Params;
+  iORM.ETM.Engine, iORM.ETM.Interfaces, DJSON.Params,
+  iORM.ConflictStrategy.Interfaces, iORM.ConflictStrategy.SameVersionWin, iORM.ConflictStrategy.LastUpdateWin,
+  iORM.Context.Interfaces, iORM.SynchroStrategy.Interfaces;
 
 const
-  IORM_VERSION = 'iORM 2 (beta 3.3)';
+  IORM_VERSION = 'iORM 2 (beta 3.4)';
 
 {$REGION 'Value aliases to make sure you have to include fewer units (in practice only the iORM unit) in the "uses" part of the units that use iORM'}
+  // NULL value constants
+  IO_INTEGER_NULL_VALUE = iORM.CommonTypes.IO_INTEGER_NULL_VALUE;
+  IO_STRING_NULL_VALUE = iORM.CommonTypes.IO_STRING_NULL_VALUE;
+  IO_DATETIME_NULL_VALUE = iORM.CommonTypes.IO_DATETIME_NULL_VALUE;
+
+  // BlindLevel bit value
+  BL_BIT_DETECT_OBJ_EXISTS = iORM.CommonTypes.BL_BIT_DETECT_OBJ_EXISTS;
+  BL_BIT_AUTO_UPDATE_PROPS = iORM.CommonTypes.BL_BIT_AUTO_UPDATE_PROPS;
+  BL_BIT_DETECT_CONFLICTS = iORM.CommonTypes.BL_BIT_DETECT_CONFLICTS;
+  // BlindLevel constant values
+  BL_DEFAULT = iORM.CommonTypes.BL_DEFAULT;
+  BL_ALL = iORM.CommonTypes.BL_ALL;
+  BL_NONE = iORM.CommonTypes.BL_NONE;
+  BL_ETM_PERSIST_TIMESLOT = iORM.CommonTypes.BL_ETM_PERSIST_TIMESLOT;
+  BL_ETM_REVERT_TO_OBJ = iORM.CommonTypes.BL_ETM_REVERT_TO_OBJ;
+  BL_ETM_REVERT_TO_DB = iORM.CommonTypes.BL_ETM_REVERT_TO_DB;
+  BL_SYNCHRO_PERSIST_LOGITEM = iORM.CommonTypes.BL_SYNCHRO_PERSIST_LOGITEM;
+  BL_SYNCHRO_PERSIST_PAYLOAD_TOCLIENT = iORM.CommonTypes.BL_SYNCHRO_PERSIST_PAYLOAD_TOCLIENT;
+  BL_SYNCHRO_PERSIST_PAYLOAD_TOSERVER = iORM.CommonTypes.BL_SYNCHRO_PERSIST_PAYLOAD_TOSERVER;
+
   // TioTypeOfCollection = (tcSingleObject, tcList);
   tcSingleObject = iORM.CommonTypes.TioTypeOfCollection.tcSingleObject;
   tcList = iORM.CommonTypes.TioTypeOfCollection.tcList;
@@ -134,6 +157,11 @@ const
   mmProperties = iORM.Attributes.mmProperties;
   mmFields = iORM.Attributes.mmFields;
 
+  // TioTrueClassMode = (tcDisabled, tcSmart, tcmStrictly);
+  tcDisabled = iORM.Attributes.tcDisabled;
+  tcSmart = iORM.Attributes.tcSmart;
+  tcmStrictly = iORM.Attributes.tcmStrictly;
+
   // TioRelationType = (rtNone, rtBelongsTo, rtHasMany, rtHasOne, rtEmbeddedHasMany, rtEmbeddedHasOne);
   rtNone = iORM.Attributes.rtNone;
   rtBelongsTo = iORM.Attributes.rtBelongsTo;
@@ -142,22 +170,29 @@ const
   rtEmbeddedHasMany = iORM.Attributes.rtEmbeddedHasMany;
   rtEmbeddedHasOne = iORM.Attributes.rtEmbeddedHasOne;
 
-  // TioEtmEventType = (etInsert, etUpdate, etDelete, etSynchronization);
-  etInsert = iORM.CommonTypes.etInsert;
-  etUpdate = iORM.CommonTypes.etUpdate;
-  etDelete = iORM.CommonTypes.etDelete;
-  etSynchronization = iORM.CommonTypes.etSynchro;
+  // TioPersistenceActionType = (atDoNotPersist, atInsert, atUpdate, atDelete);
+  atDoNotPersist = iORM.CommonTypes.atDoNotPersist;
+  atInsert = iORM.CommonTypes.atInsert;
+  atUpdate = iORM.CommonTypes.atUpdate;
+  atDelete = iORM.CommonTypes.atDelete;
+  // TioPersistenceIntentType = (itRegular, itRevert, itSynchronization);
+  itRegular = iORM.CommonTypes.itRegular;
+  itRevert = iORM.CommonTypes.itRevert;
+  itSynchro_PersistToServer = iORM.CommonTypes.itSynchro_PersistToServer;
+  itSynchro_PersistToClient = iORM.CommonTypes.itSynchro_PersistToClient;
+  // TioPersistenceConflictState = (csUndefined, csResolved, csRejected, csRejectedRaise);
+  csUndefined = iORM.CommonTypes.csUndefined;
+  csResolved = iORM.CommonTypes.csResolved;
+  csRejected = iORM.CommonTypes.csRejected;
+  csRejectedRaise = iORM.CommonTypes.csRejectedRaise;
+  // TioFreeObjAfterPersistOrDelete = (foKeepAlive, foFree, foFreeAndNil);
+  foKeepAlive = iORM.CommonTypes.foKeepAlive;
+  foFree = iORM.CommonTypes.foFree;
+  foFreeAndNil = iORM.CommonTypes.foFreeAndNil;
 
   // TioEtmDiffMode = (dmOneway, dmTwoway);
-  dmOneway = iORM.ETM.interfaces.TioEtmDiffMode.dmOneway;
-  dmTwoway = iORM.ETM.interfaces.TioEtmDiffMode.dmTwoway;
-
-  // TioEtmConflictType = (ctNoConflict, ctMasterWin, ctSlaveWin, ctLastUpdatedWin, ctManual);
-  ctNoConflict = iORM.CommonTypes.ctNoConflict;
-  ctMasterWin = iORM.CommonTypes.ctMasterWin;
-  ctSlaveWin = iORM.CommonTypes.ctSlaveWin;
-  ctLastUpdatedWin = iORM.CommonTypes.ctLastUpdatedWin;
-  ctManual = iORM.CommonTypes.ctManual;
+  dmOneway = iORM.ETM.Interfaces.TioEtmDiffMode.dmOneway;
+  dmTwoway = iORM.ETM.Interfaces.TioEtmDiffMode.dmTwoway;
 
   // TdjSkipScope = (ssMap, ssETM, ssHTTP, ssEmbeddeRelation, ssSUD, ssSaveRevertPoint, ssDJSON);
   ssMap = DJSON.Params.TdjSkipScope.ssMap;
@@ -173,13 +208,53 @@ const
   doRefresh = iORM.CommonTypes.doRefresh;
   doReload = iORM.CommonTypes.doReload;
 
+  // TioBSCloseQueryActionUpdateScope = (usLocal, usDisableIfChilds, usGlobal);
+  usLocal = iORM.CommonTypes.usLocal;
+  usDisableIfChilds = iORM.CommonTypes.usDisableIfChilds;
+  usGlobal = iORM.CommonTypes.usGlobal;
+
+  // TioBSCloseQueryOnEditingAction = (eaDisable, eaAutoPersist, eaAutoRevert);
+  eaDisable = iORM.CommonTypes.eaDisable;
+  eaAutoPersist = iORM.CommonTypes.eaAutoPersist;
+  eaAutoRevert = iORM.CommonTypes.eaAutoRevert;
+
+  // TioBSCloseQueryOnExecuteAction = (eaClose, eaTerminateApplication);
+  eaClose = iORM.CommonTypes.eaClose;
+  eaTerminateApplication = iORM.CommonTypes.eaTerminateApplication;
+
+  // TioBSCloseQueryRepeaterScope = (rsFirstLevelChilds, rsDeepChilds);
+  rsFirstLevelChilds = iORM.CommonTypes.rsFirstLevelChilds;
+  rsDeepChilds = iORM.CommonTypes.rsDeepChilds;
+
+  // TioEtmTimeSlotSynchroState = (stRegular, stToBeSynchronized, stSynchronized_SentToServer, stSynchronized_ReceivedFromServer, stSynchronized_ReceivedFromClient);
+  stRegular = iORM.Attributes.stRegular;
+  stToBeSynchronized = iORM.Attributes.stToBeSynchronized;
+  stSynchronized_SentToServer = iORM.Attributes.stSynchronized_SentToServer;
+  stSynchronized_ReceivedFromServer = iORM.Attributes.stSynchronized_ReceivedFromServer;
+  stSynchronized_ReceivedFromClient = iORM.Attributes.stSynchronized_ReceivedFromClient;
+
+  // TioSynchroLevel = (slIncremental, slFull);
+  slIncremental = iORM.SynchroStrategy.Interfaces.slIncremental;
+  slFull = iORM.SynchroStrategy.Interfaces.slFull;
+  // TioSynchroStatus = (ssInitialization, ssLoadFromClient, ssPersistToServer, ssReloadFromServer, ssPersistToClient, ssFinalization, ssCompleted);
+  ssInitialization = iORM.SynchroStrategy.Interfaces.ssInitialization;
+  ssLoadFromClient = iORM.SynchroStrategy.Interfaces.ssLoadFromClient;
+  ssPersistToServer = iORM.SynchroStrategy.Interfaces.ssPersistToServer;
+  ssReloadFromServer = iORM.SynchroStrategy.Interfaces.ssReloadFromServer;
+  ssPersistToClient = iORM.SynchroStrategy.Interfaces.ssPersistToClient;
+  ssFinalization = iORM.SynchroStrategy.Interfaces.ssFinalization;
+  ssCompleted = iORM.SynchroStrategy.Interfaces.ssCompleted;
+  // TioSynchroErrorState = (esOK, esNotCompleted, esError);
+  esOK = iORM.SynchroStrategy.Interfaces.esOK;
+  esNotCompleted = iORM.SynchroStrategy.Interfaces.esNotCompleted;
+  esError = iORM.SynchroStrategy.Interfaces.esError;
+
 {$ENDREGION}
 
 type
 
   // Type aliases to make sure you have to include fewer units (in practice only the iORM unit) in the "uses" part of the units that use iORM
 {$REGION 'Type aliases to make sure you have to include fewer units (in practice only the iORM unit) in the "uses" part of the units that use iORM'}
-
   TioSimpleViewRegister = iORM.MVVM.ViewRegister.TioSimpleViewRegister;
 
   TioCompareOp = iORM.CommonTypes.TioCompareOp;
@@ -203,6 +278,8 @@ type
   IioProperty = iORM.Context.Properties.Interfaces.IioProperty;
 
   TioMapModeType = iORM.Attributes.TioMapModeType;
+  TioTrueClassMode = iORM.Attributes.TioTrueClassMode;
+
   TioRelationType = iORM.Attributes.TioRelationType;
   TioFKAction = iORM.Attributes.TioFKAction;
   TioFKCreate = iORM.Attributes.TioFKCreate;
@@ -211,16 +288,41 @@ type
   TioActionShowMode = iORM.StdActions.Interfaces.TioActionShowMode;
   TioActionViewContextBy = iORM.StdActions.Interfaces.TioActionViewContextBy;
 
+  // FD monitor and trace mode
+  TioMonitorMode = iORM.CommonTypes.TioMonitorMode;
+
+  // Persistence types
+  TioPersistenceActionType = iORM.CommonTypes.TioPersistenceActionType;
+  TioPersistenceIntentType = iORM.CommonTypes.TioPersistenceIntentType;
+  TioPersistenceConflictState = iORM.CommonTypes.TioPersistenceConflictState;
+  TioFreeObjAfterPersistOrDelete = iORM.CommonTypes.TioFreeObjAfterPersistOrDelete;
+
+  // Conflict Strategy
+  TioCustomConflictStrategy = iORM.ConflictStrategy.Interfaces.TioCustomConflictStrategy;
+  TioSameVersionWin = iORM.ConflictStrategy.SameVersionWin.TioSameVersionWin;
+  TioLastUpdateWin = iORM.ConflictStrategy.LastUpdateWin.TioLastUpdateWin;
+
   // Entity Time Machine (ETM)
-  TioEtmTimeLine = iORM.Attributes.TioEtmTimeline;
+  TioEtmTimeLine = iORM.Attributes.TioEtmTimeLine;
   TioEtmCustomTimeSlot = iORM.Attributes.TioEtmCustomTimeSlot;
-  TioEtmEventType = iORM.CommonTypes.TioEtmEventType;
-  TioEtmConflictType = iORM.CommonTypes.TioEtmConflictType;
-  TioEtmDiffMode = iORM.ETM.interfaces.TioEtmDiffMode;
+  TioEtmDiffMode = iORM.ETM.Interfaces.TioEtmDiffMode;
+  TioEtmTimeSlotSynchroState = iORM.Attributes.TioEtmTimeSlotSynchroState;
 
   // SkipScope (vedi anche sopra (const) i valori)
   TioSkipScope = DJSON.Params.TdjSkipScope;
   TioSkipScopeSet = DJSON.Params.TdjSkipScopeSet;
+
+  // StdActions types
+  TioStdAction_ETM_AutoExec_AfterRevert = iORM.CommonTypes.TioStdAction_ETM_AutoExec_AfterRevert;
+  TioBSCloseQueryActionUpdateScope = iORM.CommonTypes.TioBSCloseQueryActionUpdateScope;
+  TioBSCloseQueryOnEditingAction = iORM.CommonTypes.TioBSCloseQueryOnEditingAction;
+  TioBSCloseQueryOnExecuteAction = iORM.CommonTypes.TioBSCloseQueryOnExecuteAction;
+  TioBSCloseQueryRepeaterScope = iORM.CommonTypes.TioBSCloseQueryRepeaterScope;
+
+  // Synchro strategies
+  TioSynchroLevel = iORM.SynchroStrategy.Interfaces.TioSynchroLevel;
+  TioSynchroStatus = iORM.SynchroStrategy.Interfaces.TioSynchroStatus;
+  TioSynchroErrorState = iORM.SynchroStrategy.Interfaces.TioSynchroErrorState;
 
 {$ENDREGION}
   // Attributes aliases to make sure you have to include fewer units (in practice only the iORM unit) in the "uses" part of the units that use iORM
@@ -286,14 +388,22 @@ type
   diViewImplements = iORM.Attributes.diViewImplements;
   diViewFor = iORM.Attributes.diViewFor;
   diViewModelImplements = iORM.Attributes.diViewModelImplements;
+  diVMImplements = iORM.Attributes.diVMImplements;
   diViewModelFor = iORM.Attributes.diViewModelFor;
   diDoNotRegisterAsInterfacedEntity = iORM.Attributes.diDoNotRegisterAsInterfacedEntity;
   diAsSingleton = iORM.Attributes.diAsSingleton;
   ioInject = iORM.Attributes.ioInject;
 
+  // Conflict strategies attributes
+  ioConflictStrategyAttribute = iORM.ConflictStrategy.Interfaces.ioConflictStrategyAttribute;
+  ioDeleteConflictStrategyAttribute = iORM.ConflictStrategy.Interfaces.ioDeleteConflictStrategyAttribute;
+  ioInsertConflictStrategyAttribute = iORM.ConflictStrategy.Interfaces.ioInsertConflictStrategyAttribute;
+  ioUpdateConflictStrategyAttribute = iORM.ConflictStrategy.Interfaces.ioUpdateConflictStrategyAttribute;
+
   // ETM attributes
   etmRepository = iORM.Attributes.etmRepository;
   etmTrace = iORM.Attributes.etmTrace;
+  etmProperty = iORM.Attributes.etmPropertyAttribute;
 
   // Other attributes
   ioMarker = iORM.Attributes.ioMarker;
@@ -303,6 +413,8 @@ type
 
   // iORM facade
   io = class
+  private
+    class procedure _FreeObjAfterPersistOrDelete(const [ref] AObj: TObject; const AFree: TioFreeObjAfterPersistOrDelete); static; inline;
   public
     // AnonymousTimer
     class procedure AnonymousTimer(const AIntervalMillisec: Integer; const AExecuteMethod: TFunc<boolean>);
@@ -311,7 +423,7 @@ type
     class function Enums: TioEnumContainerExRef;
 
     // Entity Time Machine (ETM)
-    class function etm: TIoEtmEngineRef;
+    class function ETM: TIoEtmEngineRef;
 
     // Interceptors
     class function StrategyInterceptors: TioStrategyInterceptorRegisterRef;
@@ -378,22 +490,26 @@ type
     class procedure ReloadList(const AListIntf: IInterface; const ALazy: boolean; const ALazyProps: String); overload;
     class procedure ReloadList(const AListIntf: IInterface; const ALazy: boolean = False); overload;
     class procedure ReloadList(const AListIntf: IInterface; const ALazyProps: String); overload;
+    // LoadObjVersion (internal use)
+    class function LoadObjVersion(const AContext: IioContext): Integer;
 
-    // Delete (accepting instance to delete directly)
-    class procedure DeleteObject(const AObj: TObject); overload;
-    class procedure DeleteObject(const AIntfObj: IInterface); overload;
-    class procedure DeleteList(const AListObj: TObject); overload;
-    class procedure DeleteList(const AListIntf: IInterface); overload;
+    // DeleteObject (accepting instance to delete directly)
+    class procedure DeleteObject(const [ref] AObj: TObject; const ABlindLevel: Byte = BL_DEFAULT; const AFree: TioFreeObjAfterPersistOrDelete = foKeepAlive); overload;
+    class procedure DeleteObject(const [ref] AObj: TObject; const AFree: TioFreeObjAfterPersistOrDelete); overload;
+    class procedure DeleteObject(const AIntfObj: IInterface; const ABlindLevel: Byte = BL_DEFAULT); overload;
+    class procedure _DeleteObjectInternal(const AObj: TObject; const AIntent: TioPersistenceIntentType; const ABlindLevel: Byte); static;
+    // DeleteList (accepting instance to delete directly)
+    class procedure DeleteList(const [ref] AListObj: TObject; const ABlindLevel: Byte = BL_DEFAULT; const AFree: TioFreeObjAfterPersistOrDelete = foKeepAlive); overload;
+    class procedure DeleteList(const [ref] AListObj: TObject; const AFree: TioFreeObjAfterPersistOrDelete); overload;
+    class procedure DeleteList(const AListIntf: IInterface; const ABlindLevel: Byte = BL_DEFAULT); overload;
+    class procedure _DeleteListInternal(const AListObj: TObject; const AIntent: TioPersistenceIntentType; const ABlindLevel: Byte); static;
     // Delete (accepting generic type to delete and ciriteria)
-    // NB: Ho volutamente eliminato questi metodi perchè generavano direttamente una query DELETE senza
-    //      però gli oggetti vivi dietro quindi senza poi considerare eventuali oggetti child/dettaglio
-    //      relativi a eventuali relazioni. In ogni caso sarà possibile ugualmente fare la stessa cosa
-    //      usando però la fluent interface (io.RefTo<T>.Delete) oppure con io.SQL('delete...')
-//    class procedure Delete<T>(const AID: Integer); overload;
-//    class procedure Delete<T>(const ATypeAlias: String; const AID: Integer); overload;
-//    class procedure DeleteAll<T>(const ATypeAlias: String = ''); overload;
-//    class procedure DeleteAll<T>(const AWhere: IioWhere); overload;
-//    class procedure DeleteAll<T>(const ATypeAlias: String; const AWhere: IioWhere); overload;
+    // NB: I metodi Delete qui sotto prima caricano gli oggetti vivi e poi li eliminano in modo che funzioni anche ETM e ConflictStrategy
+    class procedure Delete<T>(const AID: Integer); overload;
+    class procedure Delete<T>(const ATypeAlias: String; const AID: Integer); overload;
+    class procedure DeleteAll<T>(const ATypeAlias: String = ''); overload;
+    class procedure DeleteAll<T>(const AWhere: IioWhere); overload;
+    class procedure DeleteAll<T>(const ATypeAlias: String; const AWhere: IioWhere); overload;
 
     // Count (accepting generic type and ciriteria)
     class function Count(const ATypeName: String; const ATypeAlias: String = ''): Integer; overload;
@@ -402,6 +518,20 @@ type
     class function Count<T>(const ATypeAlias: String = ''): Integer; overload;
     class function Count<T>(const AWhere: IioWhere): Integer; overload;
     class function Count<T>(const ATypeAlias: String; const AWhere: IioWhere): Integer; overload;
+    // Max (accepting generic type and ciriteria)
+    class function Max(const ATypeName, APropertyName: String; const ATypeAlias: String = ''): Integer; overload;
+    class function Max(const ATypeName, APropertyName: String; const AWhere: IioWhere): Integer; overload;
+    class function Max(const ATypeName, APropertyName: String; const ATypeAlias: String; const AWhere: IioWhere): Integer; overload;
+    class function Max<T>(const APropertyName: String; const ATypeAlias: String = ''): Integer; overload;
+    class function Max<T>(const APropertyName: String; const AWhere: IioWhere): Integer; overload;
+    class function Max<T>(const APropertyName: String; const ATypeAlias: String; const AWhere: IioWhere): Integer; overload;
+    // Min (accepting generic type and ciriteria)
+    class function Min(const ATypeName, APropertyName: String; const ATypeAlias: String = ''): Integer; overload;
+    class function Min(const ATypeName, APropertyName: String; const AWhere: IioWhere): Integer; overload;
+    class function Min(const ATypeName, APropertyName: String; const ATypeAlias: String; const AWhere: IioWhere): Integer; overload;
+    class function Min<T>(const APropertyName: String; const ATypeAlias: String = ''): Integer; overload;
+    class function Min<T>(const APropertyName: String; const AWhere: IioWhere): Integer; overload;
+    class function Min<T>(const APropertyName: String; const ATypeAlias: String; const AWhere: IioWhere): Integer; overload;
     // Exists (accepting generic type and ciriteria)
     class function Exists(const ATypeName: String; const ATypeAlias: String = ''): boolean; overload;
     class function Exists(const ATypeName: String; const AWhere: IioWhere): boolean; overload;
@@ -417,16 +547,22 @@ type
     class function NotExists<T>(const AWhere: IioWhere): boolean; overload;
     class function NotExists<T>(const ATypeAlias: String; const AWhere: IioWhere): boolean; overload;
 
-    // Persist (accepting instance to persist directly)
-    class procedure PersistObject(const AObj: TObject; const ABlindInsert: boolean = False); overload;
-    class procedure PersistObject(const AIntfObj: IInterface; const ABlindInsert: boolean = False); overload;
-    class procedure _PersistInternal(const AObj: TObject; const ARelationPropertyName: String; const ARelationOID: Integer; const ABlindInsert: boolean;
-      const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String); overload;
+    // PersistObject (accepting instance to persist directly)
+    class procedure PersistObject(const [ref] AObj: TObject; const ABlindLevel: Byte = BL_DEFAULT; const AFree: TioFreeObjAfterPersistOrDelete = foKeepAlive); overload;
+    class procedure PersistObject(const [ref] AObj: TObject; const AFree: TioFreeObjAfterPersistOrDelete); overload;
+    class procedure PersistObject(const AIntfObj: IInterface; const ABlindLevel: Byte = BL_DEFAULT); overload;
+    class procedure _PersistObject(const AObj: TObject; const AIntent: TioPersistenceIntentType; const ABlindLevel: Byte); static;
+    class procedure _PersistObjectInternal(const AObj: TObject; const AIntent: TioPersistenceIntentType; const ARelationPropertyName: String;
+      const ARelationOID: Integer; const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String;
+      const ABlindLevel: Byte); static;
     // PersistCollection (accepting instance to persist directly)
-    class procedure PersistList(const AList: TObject; const ABlindInsert: boolean = False); overload;
-    class procedure PersistList(const AListIntf: IInterface; const ABlindInsert: boolean = False); overload;
-    class procedure _PersistListInternal(const AList: TObject; const ARelationPropertyName: String; const ARelationOID: Integer; const ABlindInsert: boolean;
-      const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String); overload;
+    class procedure PersistList(const [ref] AList: TObject; const ABlindLevel: Byte = BL_DEFAULT; const AFree: TioFreeObjAfterPersistOrDelete = foKeepAlive); overload;
+    class procedure PersistList(const [ref] AList: TObject; const AFree: TioFreeObjAfterPersistOrDelete); overload;
+    class procedure PersistList(const AListIntf: IInterface; const ABlindLevel: Byte = BL_DEFAULT); overload;
+    class procedure _PersistList(const AList: TObject; const AIntent: TioPersistenceIntentType; const ABlindLevel: Byte); static;
+    class procedure _PersistListInternal(const AList: TObject; const AIntent: TioPersistenceIntentType; const ARelationPropertyName: String;
+      const ARelationOID: Integer; const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String;
+      const ABlindLevel: Byte); static;
 
     class procedure StartTransaction(const AConnectionName: String = '');
     class procedure CommitTransaction(const AConnectionName: String = '');
@@ -462,7 +598,9 @@ type
     class function DBBuilder(const AConnectionDefName: String; const AAddIndexes: boolean = True; const AAddForeignKeys: boolean = True)
       : IioDBBuilderEngine; overload;
 
+    // Dependency Injection Container (DIC)
     class function di: TioDependencyInjectionRef;
+
     class function ExtractOID(const AObj: TObject): Integer; overload;
     class function ExtractOID(const AIntfObj: IInterface): Integer; overload;
     class function GlobalFactory: TioGlobalFactoryRef;
@@ -470,7 +608,7 @@ type
     class procedure ShowMessage(const AMessage: String);
     class function TerminateApplication: boolean;
 
-    // Create instance
+    // Create instance by DIC
     class function Create(const ATypeName: String; const ATypeAlias: String = ''; const AParams: TioConstructorParams = nil): TObject; overload;
     class function Create<T: IInterface>(const ATypeAlias: String = ''; const AParams: TioConstructorParams = nil): T; overload;
 
@@ -597,59 +735,84 @@ type
     class procedure Show<T>(const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
 
     // Show current record/instance of a ModelPresenter (even passing ViewContextProvider or an already created ViewContext)
-    class procedure ShowCurrent(const ABindSource: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
-      const AVVMAlias: String = ''); overload;
+    class procedure ShowCurrent(const ABindSource: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String = ''); overload;
     class procedure ShowCurrent(const ABindSource: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
       const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
-    class procedure ShowCurrent(const ABindSource: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
-      const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
+    class procedure ShowCurrent(const ABindSource: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent;
+      const AVVMAlias: String = ''); overload;
 
     // Show each record/instance of a ModelPresenter (even passing ViewContextProvider or an already created ViewContext)
-    class procedure ShowEach(const ABindSource: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+    class procedure ShowEach(const ABindSource: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String = ''); overload;
+    class procedure ShowEach(const ABindSource: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVCProvider: TioViewContextProvider;
       const AVVMAlias: String = ''); overload;
-    class procedure ShowEach(const ABindSource: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
-      const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
     class procedure ShowEach(const ABindSource: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent;
       const AVVMAlias: String = ''); overload;
 
     // ShowAsSelector (entity type from TargetBindSource.TypeName)
-    class procedure ShowAsSelector(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsSelector(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsSelector(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsSelector(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AVVMAlias: String = ''); overload;
+    class procedure ShowAsSelector(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsSelector(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
     // ShowAsSelector (entity type from AEntityTypeName parameter)
-    class procedure ShowAsSelector(const AEntityTypeName: String; const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsSelector(const AEntityTypeName: String; const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsSelector(const AEntityTypeName: String; const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsSelector(const AEntityTypeName: String; const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AVVMAlias: String = ''); overload;
+    class procedure ShowAsSelector(const AEntityTypeName: String; const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsSelector(const AEntityTypeName: String; const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
     // ShowAsSelector (Entity type from generic type parameter)
-    class procedure ShowAsSelector<T>(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsSelector<T>(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsSelector<T>(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsSelector<T>(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AVVMAlias: String = ''); overload;
+    class procedure ShowAsSelector<T>(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsSelector<T>(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
 
     // ShowAsWherebuilder (entity type from TargetBindSource.TypeName)
-    class procedure ShowAsWhereBuilder(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsWhereBuilder(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsWhereBuilder(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsWhereBuilder(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AVVMAlias: String = ''); overload;
+    class procedure ShowAsWhereBuilder(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsWhereBuilder(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
     // ShowAsWherebuilder (entity type from AEntityTypeName parameter)
-    class procedure ShowAsWhereBuilder(const AEntityTypeName: String; const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsWhereBuilder(const AEntityTypeName: String; const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsWhereBuilder(const AEntityTypeName: String; const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsWhereBuilder(const AEntityTypeName: String; const ASelectionTargetBS: IioMasterBindSource;
+      const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsWhereBuilder(const AEntityTypeName: String; const ASelectionTargetBS: IioMasterBindSource;
+      const AParentCloseQueryAction: IioBSCloseQueryAction; const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsWhereBuilder(const AEntityTypeName: String; const ASelectionTargetBS: IioMasterBindSource;
+      const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
     // ShowAsWherebuilder (Entity type from generic type parameter)
-    class procedure ShowAsWhereBuilder<T>(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsWhereBuilder<T>(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsWhereBuilder<T>(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsWhereBuilder<T>(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AVVMAlias: String = ''); overload;
+    class procedure ShowAsWhereBuilder<T>(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsWhereBuilder<T>(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
 
     // ShowAsETM (entity type from TargetBindSource.TypeName)
-    class procedure ShowAsETM(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsETM(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsETM(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsETM(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AVVMAlias: String = ''); overload;
+    class procedure ShowAsETM(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsETM(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
     // ShowAsWherebuilder (entity type from AEntityTypeName parameter)
-    class procedure ShowAsETM(const AEntityTypeName: String; const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsETM(const AEntityTypeName: String; const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsETM(const AEntityTypeName: String; const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsETM(const AEntityTypeName: String; const ASelectionTargetBS: IioMasterBindSource;
+      const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsETM(const AEntityTypeName: String; const ASelectionTargetBS: IioMasterBindSource;
+      const AParentCloseQueryAction: IioBSCloseQueryAction; const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsETM(const AEntityTypeName: String; const ASelectionTargetBS: IioMasterBindSource;
+      const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
     // ShowAsWherebuilder (Entity type from generic type parameter)
-    class procedure ShowAsETM<T>(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsETM<T>(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
-    class procedure ShowAsETM<T>(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsETM<T>(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AVVMAlias: String = ''); overload;
+    class procedure ShowAsETM<T>(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AVCProvider: TioViewContextProvider; const AVVMAlias: String = ''); overload;
+    class procedure ShowAsETM<T>(const ASelectionTargetBS: IioMasterBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+      const AViewContext: TComponent; const AVVMAlias: String = ''); overload;
 
     // Version
     class function Version: String;
@@ -658,7 +821,7 @@ type
 implementation
 
 uses
-  System.Rtti, iORM.Exceptions, iORM.Utilities, iORM.Where.Factory, iORM.Strategy.Factory, iORM.DuckTyped.Interfaces,
+  System.Rtti, iORM.Exceptions, iORM.Utilities, iORM.Where.Factory, iORM.PersistenceStrategy.Factory, iORM.DuckTyped.Interfaces,
   iORM.DuckTyped.Factory, iORM.DB.Factory, iORM.Abstraction, iORM.DuckTyped.StreamObject,
   iORM.LiveBindings.CommonBSBehavior, iORM.MVVM.ViewContextProviderContainer;
 
@@ -707,6 +870,14 @@ begin
   // ----- OLD CODE -----
   // Result := io.Load<T>._Where(AWhere).ToObject;
   // ----- OLD CODE -----
+end;
+
+class function io.LoadObjVersion(const AContext: IioContext): Integer;
+var
+  LConnectionDefName: String;
+begin
+  LConnectionDefName := AContext.GetTable.GetConnectionDefName;
+  Result := TioPersistenceStrategyFactory.GetStrategy(LConnectionDefName).LoadObjVersion(AContext);
 end;
 
 class procedure io.LoadToList<TItemType>(const AListObj: TObject; const AItemAlias: String);
@@ -844,35 +1015,53 @@ begin
   Result := AWhere.NotExists;
 end;
 
-class procedure io._PersistInternal(const AObj: TObject; const ARelationPropertyName: String; const ARelationOID: Integer; const ABlindInsert: boolean;
-  const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String);
+class procedure io._PersistObject(const AObj: TObject; const AIntent: TioPersistenceIntentType; const ABlindLevel: Byte);
+begin
+  _PersistObjectInternal(AObj, AIntent, '', 0, nil, '', '', ABlindLevel);
+end;
+
+class procedure io._PersistObjectInternal(const AObj: TObject; const AIntent: TioPersistenceIntentType; const ARelationPropertyName: String;
+      const ARelationOID: Integer; const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String;
+      const ABlindLevel: Byte);
 var
   LConnectionDefName: String;
 begin
   LConnectionDefName := TioMapContainer.GetConnectionDefName(AObj.ClassName);
   // Get the strategy and call the proper funtionality
-  TioStrategyFactory.GetStrategy(LConnectionDefName).PersistObject(AObj, ARelationPropertyName, ARelationOID, ABlindInsert, AMasterBSPersistence,
-    AMasterPropertyName, AMasterPropertyPath);
+  TioPersistenceStrategyFactory.GetStrategy(LConnectionDefName).PersistObject(AObj, AIntent, ARelationPropertyName, ARelationOID, AMasterBSPersistence,
+    AMasterPropertyName, AMasterPropertyPath, ABlindLevel);
 end;
 
-class procedure io.PersistObject(const AIntfObj: IInterface; const ABlindInsert: boolean);
+class procedure io.PersistList(const [ref] AList: TObject; const AFree: TioFreeObjAfterPersistOrDelete);
 begin
-  Self.PersistObject(AIntfObj as TObject, ABlindInsert);
+  PersistList(AList, BL_DEFAULT, AFree);
 end;
 
-class procedure io.PersistList(const AList: TObject; const ABlindInsert: boolean);
+class procedure io.PersistObject(const AIntfObj: IInterface; const ABlindLevel: Byte);
 begin
-  Self._PersistListInternal(AList, '', 0, ABlindInsert, nil, '', '');
+  _PersistObjectInternal(AIntfObj as TObject, itRegular, '', 0, nil, '', '', ABlindLevel);
 end;
 
-class procedure io.PersistObject(const AObj: TObject; const ABlindInsert: boolean);
+class procedure io.PersistList(const [ref] AList: TObject; const ABlindLevel: Byte; const AFree: TioFreeObjAfterPersistOrDelete);
 begin
-  Self._PersistInternal(AObj, '', 0, ABlindInsert, nil, '', '');
+  _PersistListInternal(AList, itRegular, '', 0, nil, '', '', ABlindLevel);
+  _FreeObjAfterPersistOrDelete(AList, AFree);
 end;
 
-class procedure io.PersistList(const AListIntf: IInterface; const ABlindInsert: boolean);
+class procedure io.PersistObject(const [ref] AObj: TObject; const ABlindLevel: Byte; const AFree: TioFreeObjAfterPersistOrDelete);
 begin
-  Self.PersistList(AListIntf as TObject, ABlindInsert);
+  _PersistObjectInternal(AObj, itRegular, '', 0, nil, '', '', ABlindLevel);
+  _FreeObjAfterPersistOrDelete(AObj, AFree);
+end;
+
+class procedure io.PersistList(const AListIntf: IInterface; const ABlindLevel: Byte);
+begin
+  _PersistListInternal(AListIntf as TObject, itRegular, '', 0, nil, '', '', ABlindLevel);
+end;
+
+class procedure io.PersistObject(const [ref] AObj: TObject; const AFree: TioFreeObjAfterPersistOrDelete);
+begin
+  PersistObject(AObj, BL_DEFAULT, AFree);
 end;
 
 class function io.RefTo(const AClassRef: TioClassRef; const ATypeAlias: String = ''): IioWhere;
@@ -950,8 +1139,8 @@ end;
 class procedure io.ReloadObject(const AObj: TObject; const ALazy: boolean; const ALazyProps: String);
 begin
   if not Assigned(AObj) then
-    raise EioException.Create(ClassName, 'Reload', '"AObj" cannot be nil.');
-  io.Load(AObj.ClassName).ByID(TioUtilities.ExtractOID(AObj)).Lazy(ALazy).LazyProps(ALazyProps).ClearListBefore.ToObject(AObj);
+    raise EioGenericException.Create(ClassName, 'Reload', '"AObj" cannot be nil.');
+  io.Load(AObj.ClassName).ByID(TioUtilities.ObjToID(AObj)).Lazy(ALazy).LazyProps(ALazyProps).ClearListBefore.ToObject(AObj);
 end;
 
 class procedure io.ReloadObject(const AObj: TObject; const ALazy: boolean);
@@ -966,7 +1155,7 @@ end;
 
 class procedure io.RollbackTransaction(const AConnectionName: String);
 begin
-  TioStrategyFactory.GetStrategy(AConnectionName).RollbackTransaction(AConnectionName);
+  TioPersistenceStrategyFactory.GetStrategy(AConnectionName).RollbackTransaction(AConnectionName);
 end;
 
 class function io.SQL(const ASQL: String): IioSQLDestination;
@@ -1099,14 +1288,13 @@ begin
   ShowAsSelector(ASelectionTargetBS.GetTypeName, ASelectionTargetBS, AParentCloseQueryAction, AVCProvider, AVVMAlias);
 end;
 
-class procedure io.ShowAsSelector(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
-  const AViewContext: TComponent; const AVVMAlias: String);
+class procedure io.ShowAsSelector(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent;
+  const AVVMAlias: String);
 begin
   ShowAsSelector(ASelectionTargetBS.GetTypeName, ASelectionTargetBS, AParentCloseQueryAction, AViewContext, AVVMAlias);
 end;
 
-class procedure io.ShowAsSelector<T>(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
-  const AVVMAlias: String);
+class procedure io.ShowAsSelector<T>(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String);
 begin
   if TioCommonBSBehavior.IsValidForDependencyInjectionLocator(ASelectionTargetBS, False, False) then
     if di.LocateSimpleViewFor<T>(AParentCloseQueryAction, AVVMAlias).Exist then
@@ -1115,8 +1303,7 @@ begin
       di.LocateViewVMfor<T>(AParentCloseQueryAction, AVVMAlias).SetBindSourceAsSelectorFor(ASelectionTargetBS).Show;
 end;
 
-class procedure io.ShowAsSelector(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
-  const AVVMAlias: String);
+class procedure io.ShowAsSelector(const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String);
 begin
   ShowAsSelector(ASelectionTargetBS.GetTypeName, ASelectionTargetBS, AParentCloseQueryAction, AVVMAlias);
 end;
@@ -1154,9 +1341,11 @@ class procedure io.ShowAsWhereBuilder(const AEntityTypeName: String; const ASele
 begin
   if TioCommonBSBehavior.IsValidForDependencyInjectionLocator(ASelectionTargetBS as IioBindSource, False, False) then
     if di.LocateSimpleViewFor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).Exist then
-      di.LocateSimpleViewFor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).SetViewContext(AViewContext).SetBindSourceAsWhereBuilderFor(ASelectionTargetBS).Show
+      di.LocateSimpleViewFor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).SetViewContext(AViewContext)
+        .SetBindSourceAsWhereBuilderFor(ASelectionTargetBS).Show
     else
-      di.LocateViewVMfor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).SetViewContext(AViewContext).SetBindSourceAsWhereBuilderFor(ASelectionTargetBS).Show;
+      di.LocateViewVMfor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).SetViewContext(AViewContext)
+        .SetBindSourceAsWhereBuilderFor(ASelectionTargetBS).Show;
 end;
 
 class procedure io.ShowAsWhereBuilder(const AEntityTypeName: String; const ASelectionTargetBS: IioMasterBindSource;
@@ -1164,7 +1353,8 @@ class procedure io.ShowAsWhereBuilder(const AEntityTypeName: String; const ASele
 begin
   if TioCommonBSBehavior.IsValidForDependencyInjectionLocator(ASelectionTargetBS as IioBindSource, False, False) then
     if di.LocateSimpleViewFor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).Exist then
-      di.LocateSimpleViewFor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).VCProvider(AVCProvider).SetBindSourceAsWhereBuilderFor(ASelectionTargetBS).Show
+      di.LocateSimpleViewFor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).VCProvider(AVCProvider)
+        .SetBindSourceAsWhereBuilderFor(ASelectionTargetBS).Show
     else
       di.LocateViewVMfor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).VCProvider(AVCProvider).SetBindSourceAsWhereBuilderFor(ASelectionTargetBS).Show;
 end;
@@ -1219,8 +1409,8 @@ begin
       di.LocateViewVMfor<T>(AParentCloseQueryAction, AVVMAlias).VCProvider(AVCProvider).SetBindSourceAsSelectorFor(ASelectionTargetBS).Show;
 end;
 
-class procedure io.ShowEach(const ABindSource: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
-  const AVCProvider: TioViewContextProvider; const AVVMAlias: String);
+class procedure io.ShowEach(const ABindSource: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVCProvider: TioViewContextProvider;
+  const AVVMAlias: String);
 begin
   if TioCommonBSBehavior.IsValidForDependencyInjectionLocator(ABindSource, True, False) then
     TioDependencyInjectionFactory.GetViewVMLocatorFor(ABindSource, AParentCloseQueryAction, AVVMAlias, False).VCProvider(AVCProvider).ShowEach;
@@ -1248,7 +1438,7 @@ end;
 
 class procedure io.StartTransaction(const AConnectionName: String);
 begin
-  TioStrategyFactory.GetStrategy(AConnectionName).StartTransaction(AConnectionName);
+  TioPersistenceStrategyFactory.GetStrategy(AConnectionName).StartTransaction(AConnectionName);
 end;
 
 class function io.StrategyInterceptors: TioStrategyInterceptorRegisterRef;
@@ -1268,7 +1458,7 @@ end;
 
 class procedure io.CommitTransaction(const AConnectionName: String);
 begin
-  TioStrategyFactory.GetStrategy(AConnectionName).CommitTransaction(AConnectionName);
+  TioPersistenceStrategyFactory.GetStrategy(AConnectionName).CommitTransaction(AConnectionName);
 end;
 
 class function io.Connections: TioConnectionManagerRef;
@@ -1585,12 +1775,10 @@ begin
   Result := di.LocateVM<T>(AParentCloseQueryAction, AVMAlias).ConstructorParams(AParams).Get;
 end;
 
-class procedure io.DeleteObject(const AObj: TObject);
-var
-  LConnectionDefName: String;
+class procedure io.DeleteObject(const [ref] AObj: TObject; const ABlindLevel: Byte; const AFree: TioFreeObjAfterPersistOrDelete);
 begin
-  LConnectionDefName := TioMapContainer.GetConnectionDefName(AObj.ClassName);
-  TioStrategyFactory.GetStrategy(LConnectionDefName).DeleteObject(AObj);
+  _DeleteObjectInternal(AObj, itRegular, ABlindLevel);
+  _FreeObjAfterPersistOrDelete(AObj, AFree);
 end;
 
 class function io.DBBuilder(const AConnectionDefName: String; const AAddIndexes, AAddForeignKeys: boolean): IioDBBuilderEngine;
@@ -1608,22 +1796,58 @@ begin
   Result := TioGlobalVCProviderRegister.GetInstance.DefaultVCProvider;
 end;
 
-class procedure io.DeleteObject(const AIntfObj: IInterface);
+class procedure io.DeleteObject(const AIntfObj: IInterface; const ABlindLevel: Byte);
 begin
-  Self.DeleteObject(AIntfObj as TObject);
+  _DeleteObjectInternal(AIntfObj as TObject, itRegular, ABlindLevel);
 end;
 
-class procedure io.DeleteList(const AListIntf: IInterface);
+class procedure io.Delete<T>(const AID: Integer);
 begin
-  Self.DeleteList(AListIntf as TObject);
+  Self.Delete<T>(String.Empty, AID);
 end;
 
-class procedure io.DeleteList(const AListObj: TObject);
+class procedure io.Delete<T>(const ATypeAlias: String; const AID: Integer);
 var
-  LConnectionDefName: String;
+  LTypeName: String;
+  LObj: TObject;
+  LIntf: IInterface;
 begin
-  LConnectionDefName := TioConnectionManager.GetCurrentConnectionName;
-  TioStrategyFactory.GetStrategy(LConnectionDefName).DeleteList(AListObj);
+  LTypeName := TioUtilities.GenericToString<T>(False);
+  if TioUtilities.IsAnInterfaceTypeName(LTypeName) then
+  begin
+    Supports(Self.Load(LTypeName, ATypeAlias).ByID(AID).ToObject, IInterface, LIntf);
+    Self.DeleteObject(LIntf);
+  end
+  else
+  begin
+    LObj := Self.Load(LTypeName, ATypeAlias).ByID(AID).ToObject;
+    try
+      Self.DeleteObject(LObj);
+    finally
+      LObj.Free;
+    end;
+  end;
+end;
+
+class procedure io.DeleteList(const AListIntf: IInterface; const ABlindLevel: Byte);
+begin
+  _DeleteListInternal(AListIntf as TObject, itRegular, ABlindLevel)
+end;
+
+class procedure io.DeleteList(const [ref] AListObj: TObject; const AFree: TioFreeObjAfterPersistOrDelete);
+begin
+  DeleteList(AListObj, BL_DEFAULT, AFree);
+end;
+
+class procedure io.DeleteObject(const [ref] AObj: TObject; const AFree: TioFreeObjAfterPersistOrDelete);
+begin
+  DeleteObject(AObj, BL_DEFAULT, AFree);
+end;
+
+class procedure io.DeleteList(const [ref] AListObj: TObject; const ABlindLevel: Byte; const AFree: TioFreeObjAfterPersistOrDelete);
+begin
+  _DeleteListInternal(AListObj, itRegular, ABlindLevel);
+  _FreeObjAfterPersistOrDelete(AListObj, AFree);
 end;
 
 class function io.di: TioDependencyInjectionRef;
@@ -1651,7 +1875,7 @@ begin
   Result := TioEnumContainerEx;
 end;
 
-class function io.etm: TIoEtmEngineRef;
+class function io.ETM: TIoEtmEngineRef;
 begin
   Result := TioEtmEngine;
 end;
@@ -1677,12 +1901,12 @@ end;
 
 class function io.ExtractOID(const AIntfObj: IInterface): Integer;
 begin
-  Result := TioUtilities.ExtractOID(AIntfObj);
+  Result := TioUtilities.IntfToID(AIntfObj);
 end;
 
 class function io.ExtractOID(const AObj: TObject): Integer;
 begin
-  Result := TioUtilities.ExtractOID(AObj);
+  Result := TioUtilities.ObjToID(AObj);
 end;
 
 class function io.GlobalFactory: TioGlobalFactoryRef;
@@ -1702,7 +1926,7 @@ end;
 
 class function io.InTransaction(const AConnectionName: String): boolean;
 begin
-  Result := TioStrategyFactory.GetStrategy(AConnectionName).InTransaction(AConnectionName);
+  Result := TioPersistenceStrategyFactory.GetStrategy(AConnectionName).InTransaction(AConnectionName);
 end;
 
 class function io.Load(const AClassRef: TioClassRef; const ATypeAlias: String): IioWhere;
@@ -1718,14 +1942,46 @@ begin
   Result.TypeInfo := ATypeInfo;
 end;
 
-class procedure io._PersistListInternal(const AList: TObject; const ARelationPropertyName: String; const ARelationOID: Integer; const ABlindInsert: boolean;
-  const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String);
+class procedure io._DeleteListInternal(const AListObj: TObject; const AIntent: TioPersistenceIntentType; const ABlindLevel: Byte);
 var
   LConnectionDefName: String;
 begin
   LConnectionDefName := TioConnectionManager.GetCurrentConnectionName;
-  TioStrategyFactory.GetStrategy(LConnectionDefName).PersistList(AList, ARelationPropertyName, ARelationOID, ABlindInsert, AMasterBSPersistence,
-    AMasterPropertyName, AMasterPropertyPath);
+  TioPersistenceStrategyFactory.GetStrategy(LConnectionDefName).DeleteList(AListObj, AIntent, ABlindLevel);
+end;
+
+class procedure io._DeleteObjectInternal(const AObj: TObject; const AIntent: TioPersistenceIntentType; const ABlindLevel: Byte);
+var
+  LConnectionDefName: String;
+begin
+  LConnectionDefName := TioMapContainer.GetConnectionDefName(AObj.ClassName);
+  TioPersistenceStrategyFactory.GetStrategy(LConnectionDefName).DeleteObject(AObj, AIntent, ABlindLevel);
+end;
+
+class procedure io._FreeObjAfterPersistOrDelete(const [ref] AObj: TObject; const AFree: TioFreeObjAfterPersistOrDelete);
+begin
+  case AFree of
+    foFree:
+      AObj.Free;
+    foFreeAndNil:
+      FreeAndNil(AObj);
+  end;
+end;
+
+class procedure io._PersistList(const AList: TObject; const AIntent: TioPersistenceIntentType; const ABlindLevel: Byte);
+begin
+  _PersistListInternal(AList, AIntent, '', 0, nil, '', '', ABlindLevel);
+end;
+
+class procedure io._PersistListInternal(const AList: TObject; const AIntent: TioPersistenceIntentType; const ARelationPropertyName: String;
+      const ARelationOID: Integer; const AMasterBSPersistence: TioBSPersistence; const AMasterPropertyName, AMasterPropertyPath: String;
+      const ABlindLevel: Byte);
+var
+  LConnectionDefName: String;
+begin
+  LConnectionDefName := TioConnectionManager.GetCurrentConnectionName;
+  TioPersistenceStrategyFactory.GetStrategy(LConnectionDefName).PersistList(AList, AIntent, ARelationPropertyName, ARelationOID, AMasterBSPersistence, AMasterPropertyName,
+    AMasterPropertyPath, ABlindLevel);
 end;
 
 class function io.TerminateApplication: boolean;
@@ -1825,6 +2081,74 @@ begin
   Self.LoadToObject<T>(AIntfObj as TObject, AWhere);
 end;
 
+class function io.Max(const ATypeName, APropertyName, ATypeAlias: String): Integer;
+begin
+  Result := Self.RefTo(ATypeName, ATypeAlias).Max(APropertyName);
+end;
+
+class function io.Max(const ATypeName, APropertyName: String; const AWhere: IioWhere): Integer;
+begin
+  Result := Self.Max(ATypeName, APropertyName, '', AWhere);
+end;
+
+class function io.Max(const ATypeName, APropertyName, ATypeAlias: String; const AWhere: IioWhere): Integer;
+begin
+  AWhere.TypeName := ATypeName;
+  AWhere.TypeAlias := ATypeAlias;
+  Result := AWhere.Max(APropertyName);
+end;
+
+class function io.Max<T>(const APropertyName, ATypeAlias: String): Integer;
+begin
+  Result := Self.RefTo<T>(ATypeAlias).Max(APropertyName);
+end;
+
+class function io.Max<T>(const APropertyName: String; const AWhere: IioWhere): Integer;
+begin
+  Result := Self.Max<T>(APropertyName, '', AWhere);
+end;
+
+class function io.Max<T>(const APropertyName, ATypeAlias: String; const AWhere: IioWhere): Integer;
+begin
+  AWhere.TypeName := TioUtilities.GenericToString<T>(False);
+  AWhere.TypeAlias := ATypeAlias;
+  Result := AWhere.Max(APropertyName);
+end;
+
+class function io.Min(const ATypeName, APropertyName, ATypeAlias: String): Integer;
+begin
+  Result := Self.RefTo(ATypeName, ATypeAlias).Min(APropertyName);
+end;
+
+class function io.Min(const ATypeName, APropertyName: String; const AWhere: IioWhere): Integer;
+begin
+  Result := Self.Min(ATypeName, APropertyName, '', AWhere);
+end;
+
+class function io.Min(const ATypeName, APropertyName, ATypeAlias: String; const AWhere: IioWhere): Integer;
+begin
+  AWhere.TypeName := ATypeName;
+  AWhere.TypeAlias := ATypeAlias;
+  Result := AWhere.Min(APropertyName);
+end;
+
+class function io.Min<T>(const APropertyName, ATypeAlias: String): Integer;
+begin
+  Result := Self.RefTo<T>(ATypeAlias).Min(APropertyName);
+end;
+
+class function io.Min<T>(const APropertyName: String; const AWhere: IioWhere): Integer;
+begin
+  Result := Self.Min<T>(APropertyName, '', AWhere);
+end;
+
+class function io.Min<T>(const APropertyName, ATypeAlias: String; const AWhere: IioWhere): Integer;
+begin
+  AWhere.TypeName := TioUtilities.GenericToString<T>(False);
+  AWhere.TypeAlias := ATypeAlias;
+  Result := AWhere.Min(APropertyName);
+end;
+
 class procedure io.Show(const AEntityTypeName: String; const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String);
 begin
   if di.LocateSimpleViewFor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).Exist then
@@ -1851,8 +2175,8 @@ begin
     di.LocateViewVMfor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).VCProvider(AVCProvider).Show;
 end;
 
-class procedure io.ShowAsSelector(const AEntityTypeName: String; const ASelectionTargetBS: IioBindSource;
-  const AParentCloseQueryAction: IioBSCloseQueryAction; const AVVMAlias: String);
+class procedure io.ShowAsSelector(const AEntityTypeName: String; const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+  const AVVMAlias: String);
 begin
   if TioCommonBSBehavior.IsValidForDependencyInjectionLocator(ASelectionTargetBS, False, False) then
     if di.LocateSimpleViewFor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).Exist then
@@ -1861,8 +2185,8 @@ begin
       di.LocateViewVMfor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).SetBindSourceAsSelectorFor(ASelectionTargetBS).Show;
 end;
 
-class procedure io.ShowAsSelector(const AEntityTypeName: String; const ASelectionTargetBS: IioBindSource;
-  const AParentCloseQueryAction: IioBSCloseQueryAction; const AVCProvider: TioViewContextProvider; const AVVMAlias: String);
+class procedure io.ShowAsSelector(const AEntityTypeName: String; const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+  const AVCProvider: TioViewContextProvider; const AVVMAlias: String);
 begin
   if TioCommonBSBehavior.IsValidForDependencyInjectionLocator(ASelectionTargetBS, False, False) then
     if di.LocateSimpleViewFor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).Exist then
@@ -1947,8 +2271,8 @@ begin
       di.LocateViewVMfor<T>(AParentCloseQueryAction, AVVMAlias).SetViewContext(AViewContext).SetBindSourceAsETMfor(ASelectionTargetBS).Show;
 end;
 
-class procedure io.ShowAsSelector(const AEntityTypeName: String; const ASelectionTargetBS: IioBindSource;
-  const AParentCloseQueryAction: IioBSCloseQueryAction; const AViewContext: TComponent; const AVVMAlias: String);
+class procedure io.ShowAsSelector(const AEntityTypeName: String; const ASelectionTargetBS: IioBindSource; const AParentCloseQueryAction: IioBSCloseQueryAction;
+  const AViewContext: TComponent; const AVVMAlias: String);
 begin
   if TioCommonBSBehavior.IsValidForDependencyInjectionLocator(ASelectionTargetBS, False, False) then
     if di.LocateSimpleViewFor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).Exist then
@@ -1958,26 +2282,56 @@ begin
       di.LocateViewVMfor(AEntityTypeName, AParentCloseQueryAction, AVVMAlias).SetViewContext(AViewContext).SetBindSourceAsSelectorFor(ASelectionTargetBS).Show;
 end;
 
+class procedure io.DeleteAll<T>(const ATypeAlias: String);
+begin
+  Self.DeleteAll<T>(ATypeAlias, nil);
+end;
+
+class procedure io.DeleteAll<T>(const AWhere: IioWhere);
+begin
+  Self.DeleteAll<T>(string.Empty, AWhere);
+end;
+
+class procedure io.DeleteAll<T>(const ATypeAlias: String; const AWhere: IioWhere);
+var
+  LList: TObject;
+begin
+  if TioUtilities.IsAnInterface<T> then
+    LList := Self.Load<T>(ATypeAlias).Add(AWhere).ToGenericList.OfType<TList<IInterface>>
+  else
+    LList := Self.Load<T>(ATypeAlias).Add(AWhere).ToGenericList.OfType<TObjectList<TObject>>;
+  try
+    Self.DeleteList(LList);
+  finally
+    LList.Free;
+  end;
+end;
+
 initialization
 
-// Initialize the dependency injection container
-// NB: Crea semplicemente il dictionary, la registrazione delle classi avviene più sotto chiamando TioMapContainer.Build
-TioDependencyInjectionContainer.Build;
+  // Initialize the dependency injection container
+  // NB: Crea semplicemente il dictionary, la registrazione delle classi avviene più sotto chiamando TioMapContainer.Build
+  TioDependencyInjectionContainer.Build;
 
-// Register as default DuckTypedStreamObject invoker
-// NB: L'ho messo qui perchè altrimenti nella unit dove è dichiarata la classe non
-// venive eseguito
-// NB:  Evita un AV error probabilmente causato dal fatto che i vari containers della parte ORM non sono ancora a posto
-io.di.RegisterClass<TioDuckTypedStreamObject>.Implements<IioDuckTypedStreamObject>.DisableMapImplemetersRef.Execute;
+  // Register as default DuckTypedStreamObject invoker
+  // NB: L'ho messo qui perchè altrimenti nella unit dove è dichiarata la classe non
+  // venive eseguito
+  // NB:  Evita un AV error probabilmente causato dal fatto che i vari containers della parte ORM non sono ancora a posto
+  io.di.RegisterClass<TioDuckTypedStreamObject>.Implements<IioDuckTypedStreamObject>.DisableMapImplemetersRef.Execute;
 
-// Create the ContextContainer Instance and Init it by loading
-// all entities declarated in the application
-// NB: Attualmente effettua sia il mapping delle classi per la parte ORM che la registrazione delle classi al DIC (magari meglio separare le cose?)
-TioEnumContainer._Build;
-TioMapContainer._Build;
+  // Create the ContextContainer Instance and Init it by loading
+  // all entities declarated in the application
+  // NB: Attualmente effettua sia il mapping delle classi per la parte ORM che la registrazione delle classi al DIC (magari meglio separare le cose?)
+  TioEnumContainer._Build;
+  TioMapContainer._Build;
 
-// ETM types
-io.Enums.Add<TioEtmEventType>('Insert, Update, Delete, Synchronization');
-io.Enums.Add<TioEtmConflictType>('No conflict detected, Master version win, Slave version win, Last updated win, Manual conflict resolution');
+  // Enums UI translations
+  io.Enums.Add<TioPersistenceActionType>('do not persist, insert, update, delete');
+  io.Enums.Add<TioPersistenceIntentType>('regular, revert, synchro (svr), synchro (cli)');
+  io.Enums.Add<TioPersistenceConflictState>('undefined, resolved, rejected, rejected raise');
+  io.Enums.Add<TioEtmTimeSlotSynchroState>('regular, to be synchronized, sent to server, received from server, received from client');
+  io.Enums.Add<TioSynchroLevel>('incremental, full');
+  io.Enums.Add<TioSynchroStatus>('0-initialization, 1-load from client, 2-save to server, 3-reload from client, 4-save to client, 5-finalization, 6-completed');
+  io.Enums.Add<TioSynchroErrorState>(', NOT COMPLETED, CONFLICT, ERROR');
 
 end.

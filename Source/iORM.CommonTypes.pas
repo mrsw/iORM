@@ -50,13 +50,12 @@ const
 
   IO_CONNECTIONDEF_DEFAULTNAME = 'NO_NAME';
   IO_INTEGER_NULL_VALUE = 0;
-
-  IO_CURRENTUSERINFO_NAME_EMPTY = '';
-  IO_CURRENTUSERINFO_ID_EMPTY = 0;
+  IO_STRING_NULL_VALUE = '';
+  IO_DATETIME_NULL_VALUE = 0;
 
   IO_HASMANY_CHILD_VIRTUAL_PROPERTY_NAME = 'Master___ID';
 
-  IO_USERNAME_LENGTH = 30;
+  IO_USERNAME_LENGTH = 32;
 
   // TdjSkipScope = (ssMap, ssETM, ssHTTP, ssEmbeddeRelation, ssSUD, ssSaveRevertPoint, ssDJSON);
   ssMap = DJSON.Params.TdjSkipScope.ssMap;
@@ -67,6 +66,21 @@ const
   ssSaveRevertPoint = DJSON.Params.TdjSkipScope.ssSaveRevertPoint;
   ssDJSON = DJSON.Params.TdjSkipScope.ssDJSON;
 
+  // BlindLevel bit value
+  BL_BIT_DETECT_OBJ_EXISTS = 1;
+  BL_BIT_AUTO_UPDATE_PROPS = 2;
+  BL_BIT_DETECT_CONFLICTS = 4;
+  // BlindLevel constant values
+  BL_DEFAULT = 7; // All
+  BL_ALL = 7; // All
+  BL_ETM_PERSIST_TIMESLOT = 0; // None
+  BL_ETM_REVERT_TO_OBJ = 3; // BL_BIT_DETECT_OBJ_EXISTS + BL_BIT_AUTO_UPDATE_PROPS
+  BL_ETM_REVERT_TO_DB = 1; // BL_BIT_DETECT_OBJ_EXISTS
+  BL_SYNCHRO_PERSIST_LOGITEM = 3; // BL_BIT_DETECT_OBJ_EXISTS + BL_BIT_AUTO_UPDATE_PROPS
+  BL_SYNCHRO_PERSIST_PAYLOAD_TOCLIENT = 3; // BL_BIT_DETECT_OBJ_EXISTS + BL_BIT_AUTO_UPDATE_PROPS
+  BL_SYNCHRO_PERSIST_PAYLOAD_TOSERVER = 7; // BL_BIT_DETECT_OBJ_EXISTS + BL_BIT_AUTO_UPDATE_PROPS + BL_BIT_DETECT_CONFLICTS
+  BL_NONE = 0;
+
 type
 
   // SkipScope (vedi anche sopra (const) i valori)
@@ -74,17 +88,13 @@ type
   TioSkipScopeSet = DJSON.Params.TdjSkipScopeSet;
 
   // Event handlers type
-  TioStdActionCanExecuteEvent = procedure(Sender: TObject; var CanExecute: Boolean) of object;
   TCloseQueryEvent = procedure(Sender: TObject; var CanClose: Boolean) of object;
-
+  TioCanExecuteEvent = procedure(Sender: TObject; var CanExecute: Boolean) of object;
   TioStdActionNewInstanceAsObjectEvent = procedure(const ASender: TObject; out NewInstance: TObject) of object;
   TioStdActionNewInstanceAsInterfaceEvent = procedure(const ASender: TObject; out NewInstance: IInterface) of object;
-
   TioStdAction_ETM_BeforeRevertEvent = procedure(const ASender: TObject; out ATargetObj: TObject) of object;
   TioStdAction_ETM_AfterRevertEvent = procedure(const ASender: TObject; const ARevertedObj: TObject) of object;
-
-  // StdActions types
-  TioStdAction_ETM_AutoExec_AfterRevert = (doNothing, doRefresh, doReload);
+  TioSynchronizationBeforeAfterEvent = procedure(const ASender: TObject; var AShowHideGlobalWait: Boolean) of object;
 
   // Compare operators
   TioCompareOp = (coEquals, coNotEquals, coGreater, coLower, coGreaterOrEqual, coLowerOrEqual, coLike, coNotLike, coIsNull, coIsNotNull);
@@ -136,15 +146,15 @@ type
   // ltFromBSReloadNewInstance: the bind source receives the object to bind from a source bind source and reloads it AS A NEW INSTANCE for any changes or lazy load
   TioLoadType = (ltManual, ltCreate, ltFromBSAsIs, ltFromBSReload, ltFromBSReloadNewInstance, ltAuto);
 
-  // ETM types
+  // Persistence related types
   // Note: Literal description for values added at the end of the "iORM.pas" unit (initialization)
-  TioEtmEventType = (etInsert, etUpdate, etDelete, etSynchro);
-  TioEtmConflictType = (ctNoConflict, ctMasterWin, ctSlaveWin, ctLastUpdatedWin, ctManual);
-
-  // Persistence conflict resolver mode
-  TioConflictResolverMode = (crmRaiseException, crmLatestWin, crmOldestWin, crmServerWin, crmClientWin);
+  TioPersistenceActionType = (atDoNotPersist, atInsert, atUpdate, atDelete);
+  TioPersistenceIntentType = (itRegular, itRevert, itSynchro_PersistToServer, itSynchro_PersistToClient);
+  TioPersistenceConflictState = (csUndefined, csResolved, csRejected, csRejectedRaise);
+  TioFreeObjAfterPersistOrDelete = (foKeepAlive, foFree, foFreeAndNil);
 
   // StdActions related types
+  TioStdAction_ETM_AutoExec_AfterRevert = (doNothing, doRefresh, doReload);
   TioBSCloseQueryActionUpdateScope = (usLocal, usDisableIfChilds, usGlobal);
   TioBSCloseQueryOnEditingAction = (eaDisable, eaAutoPersist, eaAutoRevert);
   TioBSCloseQueryOnExecuteAction = (eaClose, eaTerminateApplication);
@@ -173,10 +183,31 @@ type
 
   TioNullableString = TioNullable<String>;
   TioNullableInteger = TioNullable<Integer>;
+  TioNullableByte = TioNullable<Byte>;
   TioNullableFloat = TioNullable<Extended>;
   TioNullableBoolean = TioNullable<Boolean>;
   TioNullableDateTime = TioNullable<TDateTime>;
 
+  TioIndentation = record
+  private
+    FCurrentLevel: integer;
+    FWidth: integer;
+    FIndentChar: char;
+    function GetCurrentLevel: integer;
+    procedure SetCurrentLevel(const ALevel: integer);
+    function GetWidth: integer;
+    function GetIndentChars: string;
+  public
+    constructor Create(const AWidth: integer; const AStartLevel: integer = 0; const AIndentChar: char = ' ');
+
+    procedure Clear;
+    function IncIndent(const AIncrement: integer = 1): integer;
+    function DecIndent(const ADecrement: integer = 1): integer;
+
+    property CurrentLevel: integer read GetCurrentLevel write SetCurrentLevel;
+    property IndentChars: string read GetIndentChars;
+    property Width: integer read GetWidth;
+  end;
 
 implementation
 
@@ -203,7 +234,7 @@ end;
 function TioNullable<T>.GetValue: T;
 begin
   if IsNull then
-    raise EioException.Create('ioNullable: Value is null.');
+    raise EioGenericException.Create('ioNullable: Value is null.');
   result := FValue;
 end;
 
@@ -211,6 +242,53 @@ procedure TioNullable<T>.SetValue(const Value: T);
 begin
   FValue := Value;
   FIsNull := ISNULL_VALUE;
+end;
+
+{ TIndentation }
+
+procedure TioIndentation.Clear;
+begin
+  FCurrentLevel := 0;
+end;
+
+constructor TioIndentation.Create(const AWidth: integer; const AStartLevel: integer; const AIndentChar: char);
+begin
+  FIndentChar := AIndentChar;
+  FCurrentLevel := AStartLevel;
+  FWidth := AWidth;
+end;
+
+function TioIndentation.DecIndent(const ADecrement: integer = 1): integer;
+begin
+  if FCurrentLevel - ADecrement >= 0 then
+    Dec(FCurrentLevel, ADecrement)
+  else
+    FCurrentLevel := 0;
+end;
+
+function TioIndentation.GetCurrentLevel: integer;
+begin
+  Result := FCurrentLevel;
+end;
+
+function TioIndentation.GetIndentChars: string;
+begin
+  Result := StringOfChar(FIndentChar, CurrentLevel * Width);
+end;
+
+function TioIndentation.GetWidth: integer;
+begin
+  Result := FCurrentLevel * FWidth;
+end;
+
+function TioIndentation.IncIndent(const AIncrement: integer = 1): integer;
+begin
+  Inc(FCurrentLevel, AIncrement);
+end;
+
+procedure TioIndentation.SetCurrentLevel(const ALevel: integer);
+begin
+  FCurrentLevel := ALevel;
 end;
 
 end.

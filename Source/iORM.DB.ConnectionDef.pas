@@ -36,7 +36,14 @@ unit iORM.DB.ConnectionDef;
 interface
 
 uses
-  System.Classes, iORM.DB.Interfaces, iORM.CommonTypes, iORM.DBBuilder.Interfaces;
+  System.Classes,
+
+  iORM.DB.Interfaces,
+  iORM.CommonTypes,
+  iORM.DBBuilder.Interfaces,
+  iORM.SynchroStrategy.Interfaces
+
+  ;
 
 type
 
@@ -47,9 +54,9 @@ type
 
   TioCustomConnectionDef = class;
 
-  TioDBBuilderBeforeCreateOrAlterDBEvent = procedure(const Sender: TioCustomConnectionDef; const ADBStatus: TioDBBuilderEngineResult;
+  TioDBBuilderBeforeCreateOrAlterDBEvent = procedure(const Sender: TioCustomConnectionDef; const ADBStatus: TioDBBuilderStatus;
     const AScript, AWarnings: TStrings; var AAbort: Boolean) of object;
-  TioDBBuilderAfterCreateOrAlterDBEvent = procedure(const Sender: TioCustomConnectionDef; const ADBStatus: TioDBBuilderEngineResult;
+  TioDBBuilderAfterCreateOrAlterDBEvent = procedure(const Sender: TioCustomConnectionDef; const ADBStatus: TioDBBuilderStatus;
     const AScript, AWarnings: TStrings) of object;
 
   TioDBBuilderProperty = class(TPersistent)
@@ -67,7 +74,7 @@ type
   end;
 
   // Base class for all ConnectionDef components
-  TioCustomConnectionDef = class(TComponent)
+  TioCustomConnectionDef = class(TComponent, IioSynchroStrategy_TargetConnectionDef)
   strict private
     // Events
     FOnAfterCreateOrAlterDBEvent: TioDBBuilderAfterCreateOrAlterDBEvent;
@@ -78,7 +85,7 @@ type
     FAutoCreateDB: TioDBBuilderProperty;
     FBaseURL: String;
     FCharSet: String;
-    FConnectionDef: IIoConnectionDef;
+    FConnectionDef: IIoStanConnectionDef;
     FDatabase: String;
     FDatabaseStdFolder: TioDBStdFolder;
     FAsDefault: Boolean;
@@ -94,14 +101,19 @@ type
     FServer: String;
     FSQLDialect: TioSQLDialect;
     FUserName: String;
+    FSynchroStrategy_Client: IioSynchroStrategy_Client;
     function Get_Version: String;
     procedure SetAsDefault(const Value: Boolean);
+    procedure SetSynchroStrategy_Client(const ASynchroStrategy_Client: IioSynchroStrategy_Client);
+    // IioSynchroStrategy_TargetConnectionDef
+    function GetName: String;
   protected
     function DBBuilder: IioDBBuilderEngine; virtual;
     procedure DoAfterRegister;
     procedure DoBeforeRegister;
     function GetFullPathDatabase: String;
     procedure Loaded; override;
+    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     // Properties
     property AutoCreateDB: TioDBBuilderProperty read FAutoCreateDB write FAutoCreateDB;
     property BaseURL: String read FBaseURL write FBaseURL;
@@ -118,6 +130,7 @@ type
     property Server: String read FServer write FServer;
     property SQLDialect: TioSQLDialect read FSQLDialect write FSQLDialect;
     property UserName: String read FUserName write FUserName;
+    property SynchroStrategy_Client: IioSynchroStrategy_Client read FSynchroStrategy_Client write SetSynchroStrategy_Client default nil;
     // Events
     property OnAfterCreateOrAlterDB: TioDBBuilderAfterCreateOrAlterDBEvent read FOnAfterCreateOrAlterDBEvent
       write FOnAfterCreateOrAlterDBEvent;
@@ -130,7 +143,7 @@ type
     procedure RegisterConnectionDef; virtual;
     // Properties
     property AsDefault: Boolean read FAsDefault write SetAsDefault;
-    property ConnectionDef: IIoConnectionDef read FConnectionDef write FConnectionDef;
+    property ConnectionDef: IIoStanConnectionDef read FConnectionDef write FConnectionDef;
     property IsRegistered: Boolean read FIsRegistered;
     property Persistent: Boolean read FPersistent write FPersistent;
   published
@@ -149,6 +162,7 @@ type
     property AsDefault;
     property BaseURL;
     property Persistent;
+    property SynchroStrategy_Client;
   end;
 
   // Class for SQLite connection
@@ -169,6 +183,7 @@ type
     property Password;
     property Persistent;
     property Pooled;
+    property SynchroStrategy_Client;
     // Events
     property OnAfterCreateOrAlterDB;
     property OnBeforeCreateOrAlterDB;
@@ -198,6 +213,7 @@ type
     property Server;
     property SQLDialect;
     property UserName;
+    property SynchroStrategy_Client;
     // Events
     property OnAfterCreateOrAlterDB;
     property OnBeforeCreateOrAlterDB;
@@ -224,6 +240,7 @@ type
     property Port;
     property Server;
     property UserName;
+    property SynchroStrategy_Client;
     // Events
     property OnAfterCreateOrAlterDB;
     property OnBeforeCreateOrAlterDB;
@@ -246,7 +263,12 @@ implementation
 
 uses
   System.IOUtils, iORM.DB.ConnectionContainer, System.SysUtils,
-  iORM, iORM.DBBuilder.Factory;
+
+  iORM,
+  iORM.DBBuilder.Factory,
+  iORM.DBBuilder.SqlScript.Base
+
+  ;
 
 { TioCustomConnectionDef }
 
@@ -271,6 +293,7 @@ begin
   FSQLDialect := TioSQLDialect.sqlDialect3;
   FUserName := '';
   FAutoCreateDB := TioDBBuilderProperty.Create;
+  FSynchroStrategy_Client := nil;
 end;
 
 function TioCustomConnectionDef.DBBuilder: IioDBBuilderEngine;
@@ -280,6 +303,8 @@ end;
 
 destructor TioCustomConnectionDef.Destroy;
 begin
+//  if FSynchroStrategy_Client <> nil then
+//    FSynchroStrategy_Client.RemoveFreeNotification(Self);
   FAutoCreateDB.Free;
   inherited;
 end;
@@ -300,16 +325,28 @@ procedure TioCustomConnectionDef.CreateOrAlterDB(const AForce: Boolean = False);
 var
   LAbort: Boolean;
   LDBBuilderEngine: IioDBBuilderEngine;
+  LScript: IioDBBuilderSqlScript;
+  LStatus: TioDBBuilderStatus;
 begin
   LAbort := False;
+
   LDBBuilderEngine := TioDBBuilderFactory.NewEngine(Name, FAutoCreateDB.Indexes, FAutoCreateDB.ForeignKeys);
+  LStatus := LDBBuilderEngine.Analyze;
+
+  LScript := TioDBBuilderFactory.NewSqlScript;
+  LDBBuilderEngine.BuildCreateOrUpdateDBSqlScript(LScript);
+
+  // Carlo Marona
   if Assigned(FOnBeforeCreateOrAlterDBEvent) then
-    FOnBeforeCreateOrAlterDBEvent(Self, LDBBuilderEngine.Status, LDBBuilderEngine.Script, LDBBuilderEngine.Warnings, LAbort);
+    FOnBeforeCreateOrAlterDBEvent(Self, LStatus, LScript.Sql, LDBBuilderEngine.Warnings, LAbort);
+
   if not LAbort then
   begin
-    LDBBuilderEngine.CreateOrAlterDB(AForce);
+    LDBBuilderEngine.CreateOrUpdateDB(AForce, LScript);
+
+    // Carlo Marona
     if Assigned(FOnAfterCreateOrAlterDBEvent) then
-      FOnAfterCreateOrAlterDBEvent(Self, LDBBuilderEngine.Status, LDBBuilderEngine.Script, LDBBuilderEngine.Warnings);
+      FOnAfterCreateOrAlterDBEvent(Self, LStatus, LScript.Sql, LDBBuilderEngine.Warnings);
   end;
 end;
 
@@ -337,6 +374,11 @@ begin
     Result := FDatabase;
 end;
 
+function TioCustomConnectionDef.GetName: String;
+begin
+  Result := Self.Name;
+end;
+
 function TioCustomConnectionDef.Get_Version: String;
 begin
   Result := io.Version;
@@ -350,6 +392,15 @@ begin
     Exit;
   if (not FIsRegistered) then
          RegisterConnectionDef;
+end;
+
+procedure TioCustomConnectionDef.Notification(AComponent: TComponent; Operation: TOperation);
+var
+  LSynchroStrategy_Client: IioSynchroStrategy_Client;
+begin
+  inherited Notification(AComponent, Operation);
+  if (Operation = opRemove) and Supports(AComponent, IioSynchroStrategy_Client, LSynchroStrategy_Client) and (LSynchroStrategy_Client = FSynchroStrategy_Client) then
+    SetSynchroStrategy_Client(nil);
 end;
 
 procedure TioCustomConnectionDef.RegisterConnectionDef;
@@ -388,6 +439,23 @@ begin
   end;
 end;
 
+procedure TioCustomConnectionDef.SetSynchroStrategy_Client(const ASynchroStrategy_Client: IioSynchroStrategy_Client);
+begin
+  if ASynchroStrategy_Client <> FSynchroStrategy_Client then
+  begin
+    if FSynchroStrategy_Client <> nil then
+    begin
+      FSynchroStrategy_Client.RemoveFreeNotification(Self);
+      TioConnectionManager.ClearConnectionInfoSynchroStrategy(Name);
+    end;
+
+    FSynchroStrategy_Client := ASynchroStrategy_Client;
+
+    if FSynchroStrategy_Client <> nil then
+      FSynchroStrategy_Client.FreeNotification(Self);
+  end;
+end;
+
 { TioHttpConnectionDef }
 
 constructor TioHttpConnectionDef.Create(AOwner: TComponent);
@@ -401,7 +469,7 @@ begin
   // Fire the OnBeforeRegister event if implemented
   DoBeforeRegister;
   // Register the ConnectionDef
-  TioConnectionManager.NewHttpConnection(BaseURL, AsDefault, Persistent, Name);
+  TioConnectionManager.NewHttpConnection(BaseURL, AsDefault, SynchroStrategy_Client, Persistent, Name);
   // NB: Inherited must be the last line (set FIsRegistered)
   inherited;
 end;
@@ -419,7 +487,7 @@ begin
   // Fire the OnBeforeRegister event if implemented
   DoBeforeRegister;
   // Register the ConnectionDef
-  ConnectionDef := TioConnectionManager.NewSQLiteConnectionDef(GetFullPathDatabase, AsDefault, Persistent, Pooled, Name);
+  ConnectionDef := TioConnectionManager.NewSQLiteConnectionDef(GetFullPathDatabase, AsDefault, SynchroStrategy_Client, Persistent, Pooled, Name);
   // Encript
   if not Encrypt.IsEmpty then
     ConnectionDef.Params.Values['Encrypt'] := Encrypt;
@@ -453,7 +521,7 @@ begin
   DoBeforeRegister;
   // Register the ConnectionDef
   ConnectionDef := TioConnectionManager.NewFirebirdConnectionDef(Server, GetFullPathDatabase, UserName, Password, CharSet,
-    AsDefault, Persistent, Pooled, Name);
+    AsDefault, SynchroStrategy_Client, Persistent, Pooled, Name);
   // OSAuthent
   case OSAuthent of
     TioOSAuthent.oaNo:
@@ -512,7 +580,7 @@ begin
   DoBeforeRegister;
   // Register the ConnectionDef
   ConnectionDef := TioConnectionManager.NewMySQLConnectionDef(Server, GetFullPathDatabase, UserName, Password, CharSet,
-    AsDefault, Persistent, Pooled, Name);
+    AsDefault, SynchroStrategy_Client, Persistent, Pooled, Name);
   // Port
   ConnectionDef.Params.Values['Port'] := Port.ToString;
   // NB: Inherited must be the last line (set FIsRegistered)

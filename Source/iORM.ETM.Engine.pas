@@ -57,7 +57,7 @@ type
     class function _InternalBuildTimeLineWhere(const AEntityClassName: String; const AEntityID: Integer = 0): IioWhere<TioEtmCustomTimeSlot>;
     class function _InternalTimeLineFor(const AEntityClassName: String; const AEntityID: Integer; const AWhere: IioWhere = nil)
       : TioEtmTimeline; overload;
-    class procedure _ObjVersionToNegative(const AObj: TObject);
+    class procedure _ObjVersionToNegativeRevertIntent(const AObj: TObject);
     class procedure _CheckTimeSlot(const ATimeSlot: TioEtmCustomTimeSlot; const ATargetClassName: String = '');
     class function _InternalDiffAsJsonObject(const ANewestVersionObj, AOldestVersionObj: TObject; const ADiffMode: TioEtmDiffMode; const AMoreInfo: Boolean): TJSONObject; overload;
   public
@@ -133,28 +133,28 @@ begin
   if not Assigned(ATimeSlot) then
     raise EioEtmException.Create(ClassName, 'Revert', '"ATimeSlot" parameter cannot be nil.');
   // Delete operation has no state
-  if ATimeSlot.EventType = etDelete then
-    raise EioEtmException.Create(ClassName, 'Revert', Format('Hi, I''m iORM, I have to tell you an important thing.' +
-      #13#13'Revert is not allowed for "Delete" type operations because they have no information about the state to restore.' +
-      #13#13'The attempt to restore the entity of type "%s" ID %d version %d has failed.', [ATimeSlot.EntityClassName, ATimeSlot.EntityID,
-      ATimeSlot.EntityVersion]));
+//  if ATimeSlot.ActionType = atDelete then
+//    raise EioEtmException.Create(ClassName, 'Revert', Format('Hi, I''m iORM, I have to tell you an important thing.' +
+//      #13#13'Revert is not allowed for "Delete" type operations because they have no information about the state to restore.' +
+//      #13#13'The attempt to restore the entity of type "%s" ID %d version %d has failed.', [ATimeSlot.EntityClassName, ATimeSlot.EntityID,
+//      ATimeSlot.EntityToVersion]));
   // Type check
   if (not ATargetClassName.IsEmpty) and (ATimeSlot.EntityClassName <> ATargetClassName) then
     raise EioEtmException.Create(ClassName, 'Revert',
       Format('Houston we have a problem.' +
-      #13#13'The type of the entity you asked me to revert and the one contained in the provided TimeSlot do not match.' +
+      #13#13'The type of the entity you asked me to revert and the one contained in the provided TimeSlot does not match.' +
       #13#13'I can''t restore the state of type "%s" ID %d version %d to an object of type "%s".', [ATimeSlot.EntityClassName,
-      ATimeSlot.EntityID, ATimeSlot.EntityVersion, ATargetClassName]));
+      ATimeSlot.EntityID, ATimeSlot.EntityToVersion, ATargetClassName]));
 end;
 
 class function TioEtmEngine._InternalBuildTimeLineWhere(const AEntityClassName: String; const AEntityID: Integer = 0): IioWhere<TioEtmCustomTimeSlot>;
 var
   LMap: IioMap;
 begin
-  Result := io.Where<TioEtmCustomTimeSlot>('EntityClassName', coEquals, AEntityClassName)._OrderBy('[.EntityVersion]');
+  Result := io.Where<TioEtmCustomTimeSlot>('EntityClassName', coEquals, AEntityClassName)._OrderBy('[.EntityToVersion]');
   if AEntityID <> 0 then
     Result._And('EntityID', coEquals, AEntityID);
-  Result._OrderBy('[.EntityVersion]');
+  Result._OrderBy('[.EntityToVersion]');
   LMap := _InternalGetMap(AEntityClassName);
   Result.TypeName := LMap.GetTable.GetEtmTimeSlotClass.ClassName;
 end;
@@ -168,11 +168,11 @@ begin
   Result := LWhere._And(AWhere).ToGenericList.OfType<TioEtmTimeline>;
 end;
 
-class procedure TioEtmEngine._ObjVersionToNegative(const AObj: TObject);
+class procedure TioEtmEngine._ObjVersionToNegativeRevertIntent(const AObj: TObject);
 var
   LContext: IioContext;
 begin
-  LContext := TioContextFactory.Context(AObj.ClassName, nil, AObj, nil, '', '');
+  LContext := TioContextFactory.Context(itRevert, AObj.ClassName, nil, AObj, nil, '', '', BL_DEFAULT);
   if LContext.ObjVersion > 0 then
     LContext.ObjVersion := -LContext.ObjVersion;
 end;
@@ -189,12 +189,12 @@ end;
 
 class function TioEtmEngine.TimelineFor(const AIntf: IInterface; const AWhere: IioWhere): TioEtmTimeline;
 begin
-  Result := _InternalTimeLineFor((AIntf as TObject).ClassName, TioUtilities.ExtractOID(AIntf), AWhere);
+  Result := _InternalTimeLineFor((AIntf as TObject).ClassName, TioUtilities.IntfToID(AIntf), AWhere);
 end;
 
 class function TioEtmEngine.TimelineFor(const AObj: TObject; const AWhere: IioWhere): TioEtmTimeline;
 begin
-  Result := _InternalTimeLineFor(AObj.ClassName, TioUtilities.ExtractOID(AObj), AWhere);
+  Result := _InternalTimeLineFor(AObj.ClassName, TioUtilities.ObjToID(AObj), AWhere);
 end;
 
 class function TioEtmEngine.FluentTimeiineFor(const AClassName: String): IioWhere<TioEtmCustomTimeSlot>;
@@ -214,10 +214,10 @@ begin
   // Revert
   Result := dj.FromJson(ATimeSlot.EntityState, TioEtmFactory.djParamsEngine).ToObject;
   // The entity's ObjVersion property is reset with a negative value to indicate that it has been reset by the ETM
-  _ObjVersionToNegative(Result);
+  _ObjVersionToNegativeRevertIntent(Result);
   // Persist immediately
   if APersistImmediately then
-    io.PersistObject(Result);
+    io._PersistObject(Result, itRevert, BL_ETM_REVERT_TO_OBJ);
 end;
 
 class procedure TioEtmEngine.RevertToObject(const ATargetIntf: IInterface; const ATimeSlot: TioEtmCustomTimeSlot;
@@ -233,10 +233,10 @@ begin
   // Revert
   Result := dj.FromJson(ATimeSlot.EntityState, TioEtmFactory.djParamsEngine).&To<T>;
   // The entity's ObjVersion property is reset with a negative value to indicate that it has been reset by the ETM
-  _ObjVersionToNegative(Result);
+  _ObjVersionToNegativeRevertIntent(Result);
   // Persist immediately
   if APersistImmediately then
-    io.PersistObject(Result);
+    io._PersistObject(Result, itRevert, BL_ETM_REVERT_TO_OBJ);
 end;
 
 class procedure TioEtmEngine.RevertToObject(const ATargetObj: TObject; const ATimeSlot: TioEtmCustomTimeSlot; const APersistImmediately: Boolean);
@@ -246,10 +246,10 @@ begin
   // Revert
   dj.FromJson(ATimeSlot.EntityState, TioEtmFactory.djParamsEngine).&To(ATargetObj);
   // The entity's ObjVersion property is reset with a negative value to indicate that it has been reset by the ETM
-  _ObjVersionToNegative(ATargetObj);
+  _ObjVersionToNegativeRevertIntent(ATargetObj);
   // Persist immediately
   if APersistImmediately then
-    io.PersistObject(ATargetObj);
+    io._PersistObject(ATargetObj, itRevert, BL_ETM_REVERT_TO_OBJ);
 end;
 
 class procedure TioEtmEngine.RevertToBindSource(const ATimeSlot: TioEtmCustomTimeSlot; const ATargetBindSource: IioMasterBindSource; const APersistImmediately: Boolean = False);
@@ -278,9 +278,9 @@ begin
   LObj := dj.FromJson(ATimeSlot.EntityState, TioEtmFactory.djParamsEngine).ToObject;
   try
     // The entity's ObjVersion property is reset with a negative value to indicate that it has been reset by the ETM
-    _ObjVersionToNegative(LObj);
+    _ObjVersionToNegativeRevertIntent(LObj);
     // Persist immediately
-    io.PersistObject(LObj);
+    io._PersistObject(LObj, itRevert, BL_ETM_REVERT_TO_DB);
   finally
     LObj.Free;
   end;
@@ -536,4 +536,5 @@ begin
 end;
 
 end.
+
 

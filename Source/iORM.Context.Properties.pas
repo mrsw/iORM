@@ -270,6 +270,7 @@ type
     FObjUpdatedUserIDProperty: IioProperty;
     FObjUpdatedUserNameProperty: IioProperty;
     FBlobFieldExists: Boolean;
+    FContainsHasManyOrHasOneProperties: Boolean;
   private
     // ObjStatus property
     function GetObjStatusProperty: IioProperty;
@@ -303,6 +304,9 @@ type
     function GetObjUpdatedUserNameProperty: IioProperty;
     procedure SetObjUpdatedUserNameProperty(const AValue: IioProperty);
     function ObjUpdatedUserNamePropertyExist: Boolean;
+    // ContainsHasManyOrHasOneProperties property
+    function GetContainsHasManyOrHasOneProperties: Boolean;
+    procedure SetContainsHasManyOrHasOneProperties(const AValue: Boolean);
   public
     constructor Create; reintroduce;
     destructor Destroy; override;
@@ -329,6 +333,8 @@ type
     property ObjUpdatedProperty: IioProperty read GetObjUpdatedProperty write SetObjUpdatedProperty;
     property ObjUpdatedUserIDProperty: IioProperty read GetObjUpdatedUserIDProperty write SetObjUpdatedUserIDProperty;
     property ObjUpdatedUserNameProperty: IioProperty read GetObjUpdatedUserNameProperty write SetObjUpdatedUserNameProperty;
+    // ContainsHasManyOrHasOneProperties property
+    property ContainsHasManyOrHasOneProperties: Boolean read GetContainsHasManyOrHasOneProperties write SetContainsHasManyOrHasOneProperties;
   end;
 
 implementation
@@ -565,7 +571,7 @@ begin
   Result := TioUtilities.TValueToObject(AValue, True);
   // If a RelationChildPropertyPath is assigned then resolve it
   if Self.RelationChildPropertyPathAssigned and AResolvePropertyPath then
-    Result := TioUtilities.ResolveChildPropertyPath(Result, FRelationChildPropertyPath);
+    Result := TioUtilities.ResolveChildPropertyPath_GetFinalObj(Result, FRelationChildPropertyPath);
 end;
 
 function TioProperty.GetRelationChildObjectID(const Instance: Pointer): Integer;
@@ -766,7 +772,6 @@ end;
 
 function TioProperty.IsSqlUpdateRequestCompliant: Boolean;
 begin
-  { TODO : Una qualche sorta di parametro per poter decidere se nelle query update ci deve essere anche l'ID oppure no? }
   Result := (FReadWrite >= lpLoadAndPersist) and (not FTransient) and (FPropertyRole <> prObjID) and (not IsObjCreateds) and not(FRelationType in [rtHasMany, rtHasOne]);
 end;
 
@@ -945,20 +950,8 @@ end;
 
 procedure TioProperty.SetRelationChildNameAndPath(const AQualifiedChildPropertyName: String);
 begin
-  // If the AQualifiedChildPropertyName is empty then exit
-  if AQualifiedChildPropertyName.IsEmpty then
-    Exit;
-  // Create the StringList, set the Delimiter and DelimitedText
-  FRelationChildPropertyPath := TStringList.Create;
-  FRelationChildPropertyPath.Delimiter := '.';
-  FRelationChildPropertyPath.DelimitedText := AQualifiedChildPropertyName;
-  // The last element is the ChildPropertyName
-  FRelationChildPropertyName := FRelationChildPropertyPath[FRelationChildPropertyPath.Count - 1];
-  // Remove the last element
-  FRelationChildPropertyPath.Delete(FRelationChildPropertyPath.Count - 1);
-  // If the remaining list is empty then free it (optimization)
-  if FRelationChildPropertyPath.Count = 0 then
-    FreeAndNil(FRelationChildPropertyPath);
+  if not AQualifiedChildPropertyName.IsEmpty then
+    TioUtilities.ResolveChildPropertyPath_SplitPropNameAndPath(AQualifiedChildPropertyName, FRelationChildPropertyPath, FRelationChildPropertyName);
 end;
 
 procedure TioProperty.SetTable(const ATable: IioTable);
@@ -1036,6 +1029,7 @@ begin
   FObjCreatedProperty := nil;
   FObjUpdatedProperty := nil;
   FPropertyItems := TList<IioProperty>.Create;
+  FContainsHasManyOrHasOneProperties := False;
 end;
 
 destructor TioProperties.Destroy;
@@ -1068,6 +1062,11 @@ begin
     if CurrProp.GetName.ToUpper.Equals(APropertyName.ToUpper) then
       Exit(True);
   Result := False;
+end;
+
+function TioProperties.GetContainsHasManyOrHasOneProperties: Boolean;
+begin
+  Result := FContainsHasManyOrHasOneProperties;
 end;
 
 function TioProperties.GetEnumerator: TEnumerator<IioProperty>;
@@ -1129,12 +1128,12 @@ begin
     if CurrProp.GetName.ToUpper.Equals(APropertyName.ToUpper) then
       Exit(CurrProp);
   if ARaiseIfNotFound then
-    raise EioException.Create(Self.ClassName + ': Context property "' + APropertyName + '" not found.');
+    raise EioGenericException.Create(Self.ClassName + ': Context property "' + APropertyName + '" not found.');
 end;
 
 function TioProperties.GetSql: String;
 begin
-  raise EioException.Create(ClassName, 'GetSql', 'Method not to be called on this class');
+  raise EioGenericException.Create(ClassName, 'GetSql', 'Method not to be called on this class');
 end;
 
 function TioProperties.ObjCreatedPropertyExist: Boolean;
@@ -1175,6 +1174,11 @@ end;
 function TioProperties.ObjVersionPropertyExist: Boolean;
 begin
   Result := Assigned(FObjVersionProperty);
+end;
+
+procedure TioProperties.SetContainsHasManyOrHasOneProperties(const AValue: Boolean);
+begin
+  FContainsHasManyOrHasOneProperties := AValue;
 end;
 
 procedure TioProperties.SetObjCreatedProperty(const AValue: IioProperty);
@@ -1370,7 +1374,7 @@ end;
 function TioHasManyChildVirtualProperty.GetValue(const Instance: Pointer): TValue;
 begin
   // No inherited
-  raise EioException.Create(ClassName, 'GetValue', 'Method not implemented on this class');
+  raise EioGenericException.Create(ClassName, 'GetValue', 'Method not implemented on this class');
 end;
 
 function TioHasManyChildVirtualProperty.IsEnumeration: Boolean;
@@ -1394,7 +1398,7 @@ end;
 procedure TioHasManyChildVirtualProperty.SetValue(const Instance: Pointer; const AValue: TValue);
 begin
   // No inherited
-  raise EioException.Create(ClassName, 'GetValue', 'Method not implemented on this class');
+  raise EioGenericException.Create(ClassName, 'GetValue', 'Method not implemented on this class');
 end;
 
 end.

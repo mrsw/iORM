@@ -45,24 +45,24 @@ type
   TioMap = class(TInterfacedObject, IioMap)
   strict private
     FClassRef: TioClassRef;
-    FTable: IioTable;
+    FDIContainerImplementersItem: TioDIContainerImplementersItem;
     FProperties: IioProperties;
     FRttiContext: TRttiContext;
     FRttiType: TRttiInstanceType;
-    FDIContainerImplementersItem: TioDIContainerImplementersItem;
+    FTable: IioTable;
     FTrueClassVirtualMap: IioMap;
     /// Find the progenitor class map mapped on the same table and connection (for TrueClassVirtualMap creation purposes)
     function _FindProgenitorSameTableAndConnection: IioMap;
   public
     constructor Create(AClassRef:TioClassRef; ARttiContext:TRttiContext; ARttiType:TRttiInstanceType; ATable:IioTable; AProperties:IioProperties); overload;
-    function GetClassRef: TioClassRef;
+    function BlobFieldExists: Boolean;
     function GetClassName: String;
-    function GetTable: IioTable;
+    function GetClassRef: TioClassRef;
     function GetProperties: IioProperties;
-    function TrueClass: IioTrueClass;
+    function GetTable: IioTable;
     function RttiContext: TRttiContext;
     function RttiType: TRttiInstanceType;
-    function BlobFieldExists: Boolean;
+    function TrueClass: IioTrueClass;
     // DIContainerImplementersItem reference
     function GetDIContainerImplementersItem: TioDIContainerImplementersItem;
     procedure SetDIContainerImplementersItem(const AValue:TioDIContainerImplementersItem);
@@ -140,11 +140,11 @@ end;
 constructor TioMap.Create(AClassRef: TioClassRef; ARttiContext: TRttiContext; ARttiType: TRttiInstanceType; ATable: IioTable; AProperties: IioProperties);
 begin
   inherited Create;
-  FTrueClassVirtualMap := nil;
   FClassRef := AClassRef;
   FRttiContext := ARttiContext;
   FRttiType := ARttiType;
   FTable := ATable;
+  FTrueClassVirtualMap := nil;
   // Set properties
   FProperties := AProperties;
   FProperties.SetTable(FTable);

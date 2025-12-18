@@ -126,7 +126,7 @@ begin
     rtHasMany, rtEmbeddedHasMany:
       LNewAdapter := TioLiveBindingsFactory.ContainedListBindSourceAdapter(AOwner, LMasterProperty, AWhere);
     else
-      raise EioException.Create(Self.ClassName + ': Relation not found');
+      raise EioGenericException.Create(Self.ClassName + ': Relation not found');
   end;
   // Set the MasterAdapterConatainer reference (Self)
   LNewAdapter.SetMasterAdaptersContainer(Self);
@@ -167,7 +167,7 @@ begin
   begin
     if not Assigned(LBindSourceAdapter) then
       Continue;
-    AWhereDetailsContainer.AddOrUpdate(LBindSourceAdapter.GetMasterPropertyName, LBindSourceAdapter.GetioWhere);
+    AWhereDetailsContainer.AddOrUpdate(LBindSourceAdapter.GetMasterPropertyName, LBindSourceAdapter.GetWhere);
   end;
 end;
 

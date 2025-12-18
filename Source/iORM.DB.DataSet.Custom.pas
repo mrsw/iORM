@@ -53,7 +53,8 @@ type
     FLoadType: TioLoadType;
     FLazy: Boolean;
     FLazyProps: String;
-    FAsync: Boolean;
+    FAsyncLoad: Boolean;
+    FAsyncPersist: Boolean;
     FTypeOfCollection: TioTypeOfCollection; // Renderlo automatico??? (rilevamento se è una lista con DuckTyping)
     FMasterBindSource: IioBindSource;
     FMasterPropertyName: String;
@@ -87,6 +88,11 @@ type
     FBeforeSelectionInterface: TioBSABeforeAfterSelectionInterfaceEvent;
     FonSelectionInterface: TioBSASelectionInterfaceEvent;
     FAfterSelectionInterface: TioBSABeforeAfterSelectionInterfaceEvent;
+    // Persistence conflict events
+    FOnDeleteConflictException: TioBSOnPersistenceConflictExceptionEvent;
+    FOnInsertConflictException: TioBSOnPersistenceConflictExceptionEvent;
+    FOnUpdateConflictException: TioBSOnPersistenceConflictExceptionEvent;
+
     procedure _CreateAdapter(const ADataObject: TObject; const AOwnsObject: Boolean);
     function IsActive: Boolean; // IioStdActionTargetBindSource
     procedure OpenCLoseDetails(const AActive: Boolean);
@@ -94,8 +100,10 @@ type
     function GetAsDefault: Boolean;
     procedure SetAsDefault(const Value: Boolean);
     procedure InitAsDefaultOnCreate;
-    // Async
-    procedure SetAsync(const Value: Boolean);
+    // AsyncLoad
+    procedure SetAsyncLoad(const Value: Boolean);
+    // AsyncPersist
+    procedure SetAsyncPersist(const Value: Boolean);
     // Lazy
     procedure SetLazy(const Value: Boolean);
     // LazyProps
@@ -158,6 +166,13 @@ type
     // SelectorFor
     function GetSelectorFor: IioBindSource;
     procedure SetSelectorFor(const ATargetBindSource: IioBindSource);
+    // Persistence concurrency conflicts
+    function GetOnDeleteConflictException: TioBSOnPersistenceConflictExceptionEvent;
+    function GetOnInsertConflictException: TioBSOnPersistenceConflictExceptionEvent;
+    function GetOnUpdateConflictException: TioBSOnPersistenceConflictExceptionEvent;
+    procedure SetOnDeleteConflictException(const APersistenceConflictEventHandler: TioBSOnPersistenceConflictExceptionEvent);
+    procedure SetOnInsertConflictException(const APersistenceConflictEventHandler: TioBSOnPersistenceConflictExceptionEvent);
+    procedure SetOnUpdateConflictException(const APersistenceConflictEventHandler: TioBSOnPersistenceConflictExceptionEvent);
   protected
     procedure Loaded; override;
     function GetName: String;
@@ -189,7 +204,8 @@ type
     property AsDefault: Boolean read GetAsDefault write SetAsDefault; // Published: Master  // non mettere default
     property TypeName: String read GetTypeName write SetTypeName; // published: Master
     property TypeAlias: String read FTypeAlias write SetTypeAlias; // published: Master
-    property Async: Boolean read FAsync write SetAsync default False; // published: Master
+    property AsyncLoad: Boolean read FAsyncLoad write SetAsyncLoad default False; // published: Master
+    property AsyncPersist: Boolean read FAsyncPersist write SetAsyncPersist default False; // published: Master
     property LoadType: TioLoadType read GetLoadType write SetLoadType default ltManual; // published: Master
     property Lazy: Boolean read FLazy write SetLazy default False; // published: Master
     property LazyProps: String read FLazyProps write SetLazyProps; // published: Master
@@ -221,6 +237,10 @@ type
     property BeforeSelectionInterface: TioBSABeforeAfterSelectionInterfaceEvent read FBeforeSelectionInterface write FBeforeSelectionInterface;
     property OnSelectionInterface: TioBSASelectionInterfaceEvent read FonSelectionInterface write FonSelectionInterface;
     property AfterSelectionInterface: TioBSABeforeAfterSelectionInterfaceEvent read FAfterSelectionInterface write FAfterSelectionInterface;
+    // Published Events: persistence concurrency conflicts
+    property OnDeleteConflictException: TioBSOnPersistenceConflictExceptionEvent read GetOnDeleteConflictException write SetOnDeleteConflictException;
+    property OnInsertConflictException: TioBSOnPersistenceConflictExceptionEvent read GetOnInsertConflictException write SetOnInsertConflictException;
+    property OnUpdateConflictException: TioBSOnPersistenceConflictExceptionEvent read GetOnUpdateConflictException write SetOnUpdateConflictException;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -314,7 +334,8 @@ begin
   inherited;
   FAutoPost := True;
   FAutoRefreshOnNotification := True;
-  FAsync := False;
+  FAsyncLoad := False;
+  FAsyncPersist := False;
   FLoadType := ltManual;
   FLazy := False;
   FLazyProps := '';
@@ -551,6 +572,21 @@ begin
   Result := Name;
 end;
 
+function TioDataSetCustom.GetOnDeleteConflictException: TioBSOnPersistenceConflictExceptionEvent;
+begin
+  Result := FOnDeleteConflictException;
+end;
+
+function TioDataSetCustom.GetOnInsertConflictException: TioBSOnPersistenceConflictExceptionEvent;
+begin
+  Result := FOnInsertConflictException;
+end;
+
+function TioDataSetCustom.GetOnUpdateConflictException: TioBSOnPersistenceConflictExceptionEvent;
+begin
+  Result := FOnUpdateConflictException;
+end;
+
 function TioDataSetCustom.GetOnReceiveSelectionCloneObject: Boolean;
 begin
   Result := FOnReceiveSelectionCloneObject;
@@ -625,7 +661,7 @@ begin
   // Check if the operation (Open) is allowed
   TioCommonBSBehavior.CheckForOpen(Self, LoadType);
   if not CheckAdapter(True) then
-    raise EioException.Create(ClassName, 'InternalPreOpen', 'There was some problem creating the ActiveBindSourceAdapter');
+    raise EioGenericException.Create(ClassName, 'InternalPreOpen', 'There was some problem creating the ActiveBindSourceAdapter');
   GetActiveBindSourceAdapter.Active := True;
   inherited;
 end;
@@ -742,12 +778,20 @@ begin
   FAsDefault := Value;
 end;
 
-procedure TioDataSetCustom.SetAsync(const Value: Boolean);
+procedure TioDataSetCustom.SetAsyncLoad(const Value: Boolean);
 begin
-  FAsync := Value;
+  FAsyncLoad := Value;
   // Update the adapter
   if CheckAdapter then
-    GetActiveBindSourceAdapter.ioAsync := Value;
+    GetActiveBindSourceAdapter.AsyncLoad := Value;
+end;
+
+procedure TioDataSetCustom.SetAsyncPersist(const Value: Boolean);
+begin
+  FAsyncPersist := Value;
+  // Update the adapter
+  if CheckAdapter then
+    GetActiveBindSourceAdapter.AsyncPersist := Value;
 end;
 
 procedure TioDataSetCustom.SetLazy(const Value: Boolean);
@@ -957,7 +1001,7 @@ begin
   if CheckAdapter then
     GetActiveBindSourceAdapter.ItemIndex := Value
   else
-    raise EioException.Create(Self.ClassName, 'SetItemindex', 'Unassigned BindSourceAdapter');
+    raise EioGenericException.Create(Self.ClassName, 'SetItemindex', 'Unassigned BindSourceAdapter');
 end;
 
 procedure TioDataSetCustom.SetMasterBindSource(const Value: IioBindSource);
@@ -977,7 +1021,8 @@ begin
   inherited;
   LActiveBSA := GetActiveBindSourceAdapter;
   // Init the BSA
-  LActiveBSA.ioAsync := FAsync;
+  LActiveBSA.AsyncLoad := FAsyncLoad;
+  LActiveBSA.AsyncPersist := FAsyncPersist;
   LActiveBSA.ioAutoPost := FAutoPost;
   LActiveBSA.LoadType := FLoadType;
   LActiveBSA.Lazy := FLazy;
@@ -987,6 +1032,21 @@ begin
   // Register itself for notifications from BindSourceAdapter
   LActiveBSA.SetBindSource(Self);
   FTypeOfCollection := LActiveBSA.TypeOfCollection;
+end;
+
+procedure TioDataSetCustom.SetOnDeleteConflictException(const APersistenceConflictEventHandler: TioBSOnPersistenceConflictExceptionEvent);
+begin
+  FOnDeleteConflictException := APersistenceConflictEventHandler;
+end;
+
+procedure TioDataSetCustom.SetOnInsertConflictException(const APersistenceConflictEventHandler: TioBSOnPersistenceConflictExceptionEvent);
+begin
+  FOnInsertConflictException := APersistenceConflictEventHandler;
+end;
+
+procedure TioDataSetCustom.SetOnUpdateConflictException(const APersistenceConflictEventHandler: TioBSOnPersistenceConflictExceptionEvent);
+begin
+  FOnUpdateConflictException := APersistenceConflictEventHandler;
 end;
 
 procedure TioDataSetCustom.SetOnReceiveSelectionCloneObject(const Value: Boolean);
@@ -1014,7 +1074,7 @@ begin
   // then it no longer writes me the values of the sub-properties in the DFM file.
   // So I also put the set method where, however, I raise an exception if someone
   // tries to set a value.
-  raise EioException.Create(ClassName, 'SetPaging', 'This property "Paging" is not writable');
+  raise EioGenericException.Create(ClassName, 'SetPaging', 'This property "Paging" is not writable');
 end;
 
 procedure TioDataSetCustom.SetSelectorFor(const ATargetBindSource: IioBindSource);
@@ -1028,7 +1088,7 @@ begin
   // If the adapter is created and is an ActiveBindSourceAdapter then
   // update the where of the adapter also
   if CheckAdapter then
-    GetActiveBindSourceAdapter.ioTypeAlias := Value;
+    GetActiveBindSourceAdapter.TypeAlias := Value;
 end;
 
 procedure TioDataSetCustom.SetTypeName(const Value: String);
@@ -1037,7 +1097,7 @@ begin
   // If the adapter is created and is an ActiveBindSourceAdapter then
   // update the where of the adapter also
   if CheckAdapter then
-    GetActiveBindSourceAdapter.ioTypeName := Value;
+    GetActiveBindSourceAdapter.TypeName := Value;
 end;
 
 procedure TioDataSetCustom.SetTypeOfCollection(const Value: TioTypeOfCollection);
@@ -1119,7 +1179,7 @@ procedure TioDataSetCustom._CreateAdapter(const ADataObject: TObject; const AOwn
 begin
   // If an adapter already exists then raise an exception
   if CheckAdapter then
-    raise EioException.Create(ClassName, '_CreateAdapter', Format('ActiveBindSourceAdapter already exists in component "%s".', [Name]));
+    raise EioGenericException.Create(ClassName, '_CreateAdapter', Format('ActiveBindSourceAdapter already exists in component "%s".', [Name]));
   // If it is a detail bind source then get the detail BSA from the master bind source,
   // else if it is a master bind source but load type property is set to ltFromBSAsIs, ltFromBSReload or ltFromBSReloadNewInstance
   // then get the natural BSA from the source bind source else it is a master bind source then get the normal BSA.

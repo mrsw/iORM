@@ -93,7 +93,6 @@ object ViewBaseForList: TViewBaseForList
     Size.Height = 440.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 3
-    OnDblClick = ListViewDblClick
   end
   object RectangleWhere: TRectangle
     Align = Bottom
@@ -192,7 +191,7 @@ object ViewBaseForList: TViewBaseForList
     ScopeMappings = <>
     AsDefault = True
     Paging.CurrentPageOfFormat = '%d/%d'
-    Left = 67
+    Left = 59
     Top = 164
   end
   object BSWhere: TioPrototypeBindSourceMaster

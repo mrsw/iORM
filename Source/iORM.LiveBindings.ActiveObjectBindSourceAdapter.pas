@@ -49,7 +49,8 @@ type
   TioActiveObjectBindSourceAdapter = class(TObjectBindSourceAdapter, IioContainedBindSourceAdapter, IioActiveBindSourceAdapter,
     IioNaturalBindSourceAdapterSource)
   private
-    FAsync: Boolean;
+    FAsyncLoad: Boolean;
+    FAsyncPersist: Boolean;
     FWhere: IioWhere;
     FWhereDetailsFromDetailAdapters: Boolean;
     // FClassRef: TioClassRef;
@@ -72,18 +73,21 @@ type
     // TypeAlias
     procedure SetTypeAlias(const AValue: String);
     function GetTypeAlias: String;
-    // Async property
-    function GetIoAsync: Boolean;
-    procedure SetIoAsync(const Value: Boolean);
+    // AsyncLoad property
+    function GetAsyncLoad: Boolean;
+    procedure SetAsyncLoad(const Value: Boolean);
+    // AsyncPersist property
+    function GetAsyncPersist: Boolean;
+    procedure SetAsyncPersist(const Value: Boolean);
     // AutoPost property
     procedure SetioAutoPost(const Value: Boolean);
     function GetioAutoPost: Boolean;
     // WhereStr property
-    procedure SetIoWhere(const Value: IioWhere);
-    function GetIoWhere: IioWhere;
+    procedure SetWhere(const Value: IioWhere);
+    function GetWhere: IioWhere;
     // ioWhereDetailsFromDetailAdapters property
-    function GetioWhereDetailsFromDetailAdapters: Boolean;
-    procedure SetioWhereDetailsFromDetailAdapters(const Value: Boolean);
+    function GetWhereDetailsFromDetailAdapters: Boolean;
+    procedure SetWhereDetailsFromDetailAdapters(const Value: Boolean);
     // ioViewDataType
     function GetTypeOfCollection: TioTypeOfCollection;
     // ioOwnsObjects
@@ -237,7 +241,7 @@ end;
 
 procedure TioActiveObjectBindSourceAdapter.Append(AObject: IInterface);
 begin
-  raise EioException.Create(Self.ClassName, 'Append', 'This ActiveBindSourceAdapter is for class referenced instances only.');
+  raise EioGenericException.Create(Self.ClassName, 'Append', 'This ActiveBindSourceAdapter is for class referenced instances only.');
 end;
 
 function TioActiveObjectBindSourceAdapter.AsActiveBindSourceAdapter: IioActiveBindSourceAdapter;
@@ -261,7 +265,8 @@ begin
   FLoadType := ltAuto;
   FLazy := False;
   FLazyProps := '';
-  FAsync := False;
+  FAsyncLoad := False;
+  FAsyncPersist := False;
   FReloading := False;
   FBSPersistenceDeleting := False;
 
@@ -284,7 +289,7 @@ end;
 
 procedure TioActiveObjectBindSourceAdapter.DeleteListViewItem(const AItemIndex, ADelayMilliseconds: Integer);
 begin
-  raise EioException.Create(Self.ClassName, 'DeleteListViewItem', 'Method not available in ObjectBindSourceAdapters.');
+  raise EioGenericException.Create(Self.ClassName, 'DeleteListViewItem', 'Method not available in ObjectBindSourceAdapters.');
 end;
 
 destructor TioActiveObjectBindSourceAdapter.Destroy;
@@ -387,7 +392,7 @@ begin
   // if not empty extract the detail object
   if not AValue.IsEmpty then
     if FMasterProperty.IsInterface then
-      raise EioException.Create(Self.ClassName, 'ExtractDetailObject', 'Master property (in the master object) is an interface type.')
+      raise EioGenericException.Create(Self.ClassName, 'ExtractDetailObject', 'Master property (in the master object) is an interface type.')
     else
       LDetailObj := AValue.AsObject;
   // Set it to the Adapter itself
@@ -490,9 +495,14 @@ begin
   Result := Self.Fields;
 end;
 
-function TioActiveObjectBindSourceAdapter.GetIoAsync: Boolean;
+function TioActiveObjectBindSourceAdapter.GetAsyncLoad: Boolean;
 begin
-  Result := FAsync;
+  Result := FAsyncLoad;
+end;
+
+function TioActiveObjectBindSourceAdapter.GetAsyncPersist: Boolean;
+begin
+  Result := FAsyncPersist;
 end;
 
 function TioActiveObjectBindSourceAdapter.NewDetailBindSourceAdapter(const AOwner: TComponent; const AMasterPropertyName: String; const AWhere: IioWhere)
@@ -513,7 +523,7 @@ begin
   Result := TYPE_OF_COLLECTION;
 end;
 
-function TioActiveObjectBindSourceAdapter.GetIoWhere: IioWhere;
+function TioActiveObjectBindSourceAdapter.GetWhere: IioWhere;
 begin
   Result := FWhere;
   // Fill the WhereDetails from the DetailAdapters container if enabled
@@ -526,7 +536,7 @@ begin
   end;
 end;
 
-function TioActiveObjectBindSourceAdapter.GetioWhereDetailsFromDetailAdapters: Boolean;
+function TioActiveObjectBindSourceAdapter.GetWhereDetailsFromDetailAdapters: Boolean;
 begin
   Result := FWhereDetailsFromDetailAdapters;
 end;
@@ -598,7 +608,7 @@ end;
 
 procedure TioActiveObjectBindSourceAdapter.Insert(AObject: IInterface);
 begin
-  raise EioException.Create(Self.ClassName, 'Append', 'This ActiveBindSourceAdapter is for class referenced instances only.');
+  raise EioGenericException.Create(Self.ClassName, 'Append', 'This ActiveBindSourceAdapter is for class referenced instances only.');
 end;
 
 function TioActiveObjectBindSourceAdapter.HasBindSource: Boolean;
@@ -628,7 +638,7 @@ end;
 
 procedure TioActiveObjectBindSourceAdapter.LoadPage;
 begin
-  raise EioException.Create(Self.ClassName, 'LoadPage', 'Method not available in ObjectBindSourceAdapters.');
+  raise EioGenericException.Create(Self.ClassName, 'LoadPage', 'Method not available in ObjectBindSourceAdapters.');
 end;
 
 function TioActiveObjectBindSourceAdapter.MasterAdaptersContainer: IioDetailBindSourceAdaptersContainer;
@@ -745,12 +755,12 @@ end;
 
 procedure TioActiveObjectBindSourceAdapter.SetDataObject(const ADataObject: IInterface; const AOwnsObject: Boolean);
 begin
-  raise EioException.Create(Self.ClassName, 'SetDataObject', 'This ActiveBindSourceAdapter is for class referenced instances only (not interfaced).');
+  raise EioGenericException.Create(Self.ClassName, 'SetDataObject', 'This ActiveBindSourceAdapter is for class referenced instances only (not interfaced).');
 end;
 
 procedure TioActiveObjectBindSourceAdapter.InternalSetDataObject(const ADataObject: IInterface; const AOwnsObject: Boolean);
 begin
-  raise EioException.Create(Self.ClassName, 'InternalSetDataObject', 'This ActiveBindSourceAdapter is for class referenced instances only (not interfaced).');
+  raise EioGenericException.Create(Self.ClassName, 'InternalSetDataObject', 'This ActiveBindSourceAdapter is for class referenced instances only (not interfaced).');
 end;
 
 procedure TioActiveObjectBindSourceAdapter.InternalSetDataObject(const ADataObject: TObject; const AOwnsObject: Boolean);
@@ -795,9 +805,14 @@ begin
   GetDataSetLinkContainer.Refresh;
 end;
 
-procedure TioActiveObjectBindSourceAdapter.SetIoAsync(const Value: Boolean);
+procedure TioActiveObjectBindSourceAdapter.SetAsyncLoad(const Value: Boolean);
 begin
-  FAsync := Value;
+  FAsyncLoad := Value;
+end;
+
+procedure TioActiveObjectBindSourceAdapter.SetAsyncPersist(const Value: Boolean);
+begin
+  FAsyncPersist := Value;
 end;
 
 procedure TioActiveObjectBindSourceAdapter.SetioAutoPost(const Value: Boolean);
@@ -805,12 +820,12 @@ begin
   Self.AutoPost := Value;
 end;
 
-procedure TioActiveObjectBindSourceAdapter.SetIoWhere(const Value: IioWhere);
+procedure TioActiveObjectBindSourceAdapter.SetWhere(const Value: IioWhere);
 begin
   FWhere := Value;
 end;
 
-procedure TioActiveObjectBindSourceAdapter.SetioWhereDetailsFromDetailAdapters(const Value: Boolean);
+procedure TioActiveObjectBindSourceAdapter.SetWhereDetailsFromDetailAdapters(const Value: Boolean);
 begin
   FWhereDetailsFromDetailAdapters := Value;
 end;

@@ -35,6 +35,24 @@ unit iORM.Http.Interfaces;
 
 interface
 
+const
+
+  HTTP_METHOD_NAME_COUNT = 'Count';
+  HTTP_METHOD_NAME_DELETE = 'Delete';
+  HTTP_METHOD_NAME_DELETELIST = 'DeleteList';
+  HTTP_METHOD_NAME_DELETEOBJECT = 'DeleteObject';
+  HTTP_METHOD_NAME_DOSYNCHRONIZATION = 'DoSynchronization';
+  HTTP_METHOD_NAME_LOADDATASET = 'LoadDataSet';
+  HTTP_METHOD_NAME_LOADLIST = 'LoadList';
+  HTTP_METHOD_NAME_LOADOBJECT = 'LoadObject';
+  HTTP_METHOD_NAME_MAX = 'Max';
+  HTTP_METHOD_NAME_MIN = 'Min';
+  HTTP_METHOD_NAME_PERSISTLIST = 'PersistList';
+  HTTP_METHOD_NAME_PERSISTOBJECT = 'PersistObject';
+  HTTP_METHOD_NAME_SQLDESTEXECUTE = 'SQLDestExecute';
+  HTTP_METHOD_NAME_SQLDESTLOADDATASET = 'SQLDestLoadDataSet';
+  HTTP_METHOD_NAME_TEST = 'Test';
+
   // All the interfaces declared here are moved on iORM.DB.Interfacex to avoi
   //  a circular reference error (IioHttpRequestBody, IioHttpResponseBody)
 

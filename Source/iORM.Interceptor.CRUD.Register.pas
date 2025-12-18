@@ -42,7 +42,7 @@ interface
 
 uses
   iORM.Interceptor.CRUD,
-  iORM.Context.Interfaces, System.Generics.Collections;
+  iORM.Context.Interfaces, System.Generics.Collections, System.SysUtils;
 
 type
 
@@ -66,28 +66,27 @@ type
     class procedure Clean;
   public
     class var FInternalContainer: TObjectDictionary<String, TioCRUDInterceptorList>;
-    class procedure RegisterInterceptor(const ACRUDInterceptor: TioCRUDInterceptorRef; const ATypeName: String;
-      const AInterceptOnlyOnConnectionName: String = '');
-    class procedure UnregisterInterceptor(const ACRUDInterceptor: TioCRUDInterceptorRef; const ATypeName: String;
-      const AInterceptOnlyOnConnectionName: String = '');
+    class procedure RegisterInterceptor(const ACRUDInterceptor: TioCRUDInterceptorRef; const ATypeName: String; const AInterceptOnlyOnConnectionName: String = '');
+    class procedure UnregisterInterceptor(const ACRUDInterceptor: TioCRUDInterceptorRef; const ATypeName: String; const AInterceptOnlyOnConnectionName: String = '');
     // Obj load
     class function BeforeLoad(const AContext: IioContext; const AObj: TObject; var ADone: Boolean): TObject;
     class function AfterLoad(const AContext: IioContext; const AObj: TObject): TObject;
+    class function OnLoadException(const AContext: IioContext; const AException: Exception): Boolean;
     // Obj insert
     class procedure BeforeInsert(const AContext: IioContext; var ADone: Boolean);
     class procedure AfterInsert(const AContext: IioContext);
+    class function OnInsertException(const AContext: IioContext; const AException: Exception): Boolean;
     // Obj update
     class procedure BeforeUpdate(const AContext: IioContext; var ADone: Boolean);
     class procedure AfterUpdate(const AContext: IioContext);
+    class function OnUpdateException(const AContext: IioContext; const AException: Exception): Boolean;
     // Obj delete
     class procedure BeforeDelete(const AContext: IioContext; var ADone: Boolean);
     class procedure AfterDelete(const AContext: IioContext);
+    class function OnDeleteException(const AContext: IioContext; const AException: Exception): Boolean;
   end;
 
 implementation
-
-uses
-  System.SysUtils;
 
 { TioObjCrudInterceptorRegister }
 
@@ -301,6 +300,88 @@ class procedure TioCRUDInterceptorRegister.Clean;
 begin
   if Assigned(FInternalContainer) then
     FreeAndNil(FInternalContainer);
+end;
+
+class function TioCRUDInterceptorRegister.OnLoadException(const AContext: IioContext; const AException: Exception): Boolean;
+var
+  LItem: TioCRUDInterceptorItem;
+  LCurrConnectionName: String;
+begin
+  if Assigned(FInternalContainer) and FInternalContainer.ContainsKey(AContext.Map.GetClassName) then
+  begin
+    // In caso di più interceptor registrati basta che uno solo ritorni True che il risultato sarà True
+    Result := False;
+    // Ottimizzazione perchè internamente poi accede al ConnectionManager che è threadsafe (Locked)
+    LCurrConnectionName := AContext.Map.GetTable.GetConnectionDefName;
+    // Cicla per tutti gli interceptor registrati per la classe e li invoca
+    for LItem in FInternalContainer.Items[AContext.Map.GetClassName] do
+      if LItem.ConnectionName.IsEmpty or (LItem.ConnectionName = LCurrConnectionName) then
+        Result := Result or LItem.Interceptor.OnLoadException(AContext, AException);
+  end
+  // Se non ci sono interceptor registrati per questa classe ritorna true in modo che venga fatto il re-raise
+  else
+    Result := True;
+end;
+
+class function TioCRUDInterceptorRegister.OnDeleteException(const AContext: IioContext; const AException: Exception): Boolean;
+var
+  LItem: TioCRUDInterceptorItem;
+  LCurrConnectionName: String;
+begin
+  if Assigned(FInternalContainer) and FInternalContainer.ContainsKey(AContext.Map.GetClassName) then
+  begin
+    // In caso di più interceptor registrati basta che uno solo ritorni True che il risultato sarà True
+    Result := False;
+    // Ottimizzazione perchè internamente poi accede al ConnectionManager che è threadsafe (Locked)
+    LCurrConnectionName := AContext.Map.GetTable.GetConnectionDefName;
+    // Cicla per tutti gli interceptor registrati per la classe e li invoca
+    for LItem in FInternalContainer.Items[AContext.Map.GetClassName] do
+      if LItem.ConnectionName.IsEmpty or (LItem.ConnectionName = LCurrConnectionName) then
+        Result := Result or LItem.Interceptor.OnDeleteException(AContext, AException);
+  end
+  // Se non ci sono interceptor registrati per questa classe ritorna true in modo che venga fatto il re-raise
+  else
+    Result := True;
+end;
+
+class function TioCRUDInterceptorRegister.OnInsertException(const AContext: IioContext; const AException: Exception): Boolean;
+var
+  LItem: TioCRUDInterceptorItem;
+  LCurrConnectionName: String;
+begin
+  if Assigned(FInternalContainer) and FInternalContainer.ContainsKey(AContext.Map.GetClassName) then
+  begin
+    // In caso di più interceptor registrati basta che uno solo ritorni True che il risultato sarà True
+    Result := False;
+    // Cicla per tutti gli interceptor registrati per la classe e li invoca
+    for LItem in FInternalContainer.Items[AContext.Map.GetClassName] do
+      if LItem.ConnectionName.IsEmpty or (LItem.ConnectionName = LCurrConnectionName) then
+        Result := Result or LItem.Interceptor.OnInsertException(AContext, AException);
+  end
+  // Se non ci sono interceptor registrati per questa classe ritorna true in modo che venga fatto il re-raise
+  else
+    Result := True;
+end;
+
+class function TioCRUDInterceptorRegister.OnUpdateException(const AContext: IioContext; const AException: Exception): Boolean;
+var
+  LItem: TioCRUDInterceptorItem;
+  LCurrConnectionName: String;
+begin
+  if Assigned(FInternalContainer) and FInternalContainer.ContainsKey(AContext.Map.GetClassName) then
+  begin
+    // In caso di più interceptor registrati basta che uno solo ritorni True che il risultato sarà True
+    Result := False;
+    // Ottimizzazione perchè internamente poi accede al ConnectionManager che è threadsafe (Locked)
+    LCurrConnectionName := AContext.Map.GetTable.GetConnectionDefName;
+    // Cicla per tutti gli interceptor registrati per la classe e li invoca
+    for LItem in FInternalContainer.Items[AContext.Map.GetClassName] do
+      if LItem.ConnectionName.IsEmpty or (LItem.ConnectionName = LCurrConnectionName) then
+        Result := Result or LItem.Interceptor.OnUpdateException(AContext, AException);
+  end
+  // Se non ci sono interceptor registrati per questa classe ritorna true in modo che venga fatto il re-raise
+  else
+    Result := True;
 end;
 
 { TioCRUDInterceptorItem }

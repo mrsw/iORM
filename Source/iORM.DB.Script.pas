@@ -50,7 +50,7 @@ type
   public
     constructor Create(const AConnection: IioConnection; const AScript: TStrings);
     destructor Destroy; override;
-    procedure Execute;
+    function Execute: boolean;
   end;
 
 implementation
@@ -71,7 +71,7 @@ begin
   if Assigned(AConnection) and AConnection.IsDBConnection then
     FScriptComponent.Connection := AConnection.AsDBConnection.GetConnection
   else
-    raise EioException.Create(ClassName, 'Create', '"AConnection" parameter must be a DB connection type');
+    raise EioGenericException.Create(ClassName, 'Create', '"AConnection" parameter must be a DB connection type');
 end;
 
 destructor TioScript.Destroy;
@@ -81,12 +81,15 @@ begin
   inherited;
 end;
 
-procedure TioScript.Execute;
+function TioScript.Execute: boolean;
 begin
+  Result := False;
+
   FConnectionComponent.StartTransaction;
   try
     FScriptComponent.ExecuteScript(FScript);
     FConnectionComponent.Commit;
+    Result := True;
   except
     FConnectionComponent.Rollback;
   end;

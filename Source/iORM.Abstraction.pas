@@ -92,7 +92,7 @@ type
   public
     class function CreateNewTimer: TioTimer;
     constructor Create; virtual;
-    property Enabled: Boolean read GetEnabled write SetEnabled default True;
+    property Enabled: Boolean read GetEnabled write SetEnabled default False;
     property Interval: Cardinal read GetInterval write SetInterval default 1000;
     property OnTimer: TNotifyEvent read GetOnTimer write SetOnTimer;
     property Tag:Integer read GetTag write SetTag;
@@ -179,7 +179,7 @@ end;
 class function TioTimer.GetConcreteClass: TioTimerRef;
 begin
   if not Assigned(FConcreteClass_NoDirectCall) then
-    raise EioException.Create(Self.ClassName, 'GetConcreteClass', 'You must put one of the TioVCL or TioFMX components somewhere in the application.');
+    raise EioGenericException.Create(Self.ClassName, 'GetConcreteClass', 'You must put one of the TioVCL or TioFMX components somewhere in the application.');
   Result := FConcreteClass_NoDirectCall;
 end;
 
@@ -241,7 +241,7 @@ end;
 class function TioApplication.GetConcreteClass: TioApplicationRef;
 begin
   if not Assigned(FConcreteClass_NoDirectCall) then
-    raise EioException.Create(Self.ClassName, 'GetConcreteClass', 'You must put one of the TioVCL or TioFMX components somewhere in the application.');
+    raise EioGenericException.Create(Self.ClassName, 'GetConcreteClass', 'You must put one of the TioVCL or TioFMX components somewhere in the application.');
   Result := FConcreteClass_NoDirectCall;
 end;
 
@@ -285,7 +285,7 @@ end;
 class function TioAction.GetConcreteClass: TioActionRef;
 begin
   if not Assigned(FConcreteClass_NoDirectCall) then
-    raise EioException.Create(Self.ClassName, 'GetConcreteClass', 'You must put one of the TioVCL or TioFMX components somewhere in the application.');
+    raise EioGenericException.Create(Self.ClassName, 'GetConcreteClass', 'You must put one of the TioVCL or TioFMX components somewhere in the application.');
   Result := FConcreteClass_NoDirectCall;
 end;
 
@@ -304,7 +304,7 @@ end;
 class function TioControl.GetConcreteClass: TioControlRef;
 begin
   if not Assigned(FConcreteClass_NoDirectCall) then
-    raise EioException.Create(Self.ClassName, 'GetConcreteClass', 'You must put one of the TioVCL or TioFMX components somewhere in the application.');
+    raise EioGenericException.Create(Self.ClassName, 'GetConcreteClass', 'You must put one of the TioVCL or TioFMX components somewhere in the application.');
   Result := FConcreteClass_NoDirectCall;
 end;
 
@@ -332,7 +332,7 @@ begin
   FTimer.OnTimer := OnTimerEventHandler;
   FTimer.Interval := AIntervalMillisec;
   if not Assigned(AExecuteMethod) then
-    raise EioException.Create(Self.ClassName, 'Constructor', '"AExecuteMethod" parameter must be assigned');
+    raise EioGenericException.Create(Self.ClassName, 'Constructor', '"AExecuteMethod" parameter must be assigned');
   FExecuteMethod := AExecuteMethod;
   FTimer.Enabled := True;
 end;
@@ -345,10 +345,13 @@ end;
 
 procedure TioAnonymousTimer.OnTimerEventHandler(Sender: TObject);
 begin
-  FTimer.Enabled := False;
-  FTimer.Enabled := FExecuteMethod;
-  if not FTimer.Enabled then
-    Self.Free;
+  FTimer.Enabled := False; // NB: Leave it to false
+  try
+    FTimer.Enabled := FExecuteMethod;
+  finally
+    if not FTimer.Enabled then
+      Self.Free;
+  end;
 end;
 
 end.

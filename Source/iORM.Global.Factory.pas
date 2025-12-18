@@ -39,8 +39,8 @@ uses
   iORM.Context.Factory, iORM.DB.Factory,
   iORM.DuckTyped.Factory, iORM.LazyLoad.Factory,
   iORM.LiveBindings.Factory, iORM.ObjectsForge.Factory,
-  iORM.RttiContext.Factory, iORM.MVVM.Factory, iORM.Containers.Factory,
-  iORM.Where.Factory, iORM.Strategy.Interfaces, iORM.Strategy.Factory,
+  iORM.RttiContext.Factory, iORM.MVVM.Factory,
+  iORM.Where.Factory, iORM.PersistenceStrategy.Interfaces, iORM.PersistenceStrategy.Factory,
   iORM.DBBuilder.Factory;
 
 Type
@@ -54,9 +54,8 @@ Type
   TioObjectMakerFactoryRef = class of TioObjectMakerFactory;
   TioRttiContextFactoryRef = class of TioRttiFactory;
   TioMVVMFactoryRef = class of TioMVVMFactory;
-  TioContainersFactoryRef = class of TioContainersFactory;
   TioWhereFactoryRef = class of TioWhereFactory;
-  TioStrategyFactoryRef = class of TioStrategyFactory;
+  TioStrategyFactoryRef = class of TioPersistenceStrategyFactory;
 
   TioGlobalFactory = class
   public
@@ -69,7 +68,6 @@ Type
     class function ObjectMakerFactory: TioObjectMakerFactoryRef;
     class function RttiFactory: TioRttiContextFactoryRef;
     class function MVVMFactory: TioMVVMFactoryRef;
-    class function ContainersFactory: TioContainersFactoryRef;
     class function WhereFactory: TioWhereFactoryRef;
     class function StrategyFactory: TioStrategyFactoryRef;
   end;
@@ -79,11 +77,6 @@ Type
 implementation
 
 { TioGlobalFactory }
-
-class function TioGlobalFactory.ContainersFactory: TioContainersFactoryRef;
-begin
-  Result := TioContainersFactory;
-end;
 
 class function TioGlobalFactory.ContextFactory: TioContextFactoryRef;
 begin
@@ -132,7 +125,7 @@ end;
 
 class function TioGlobalFactory.StrategyFactory: TioStrategyFactoryRef;
 begin
-  Result := TioStrategyFactory;
+  Result := TioPersistenceStrategyFactory;
 end;
 
 class function TioGlobalFactory.WhereFactory: TioWhereFactoryRef;

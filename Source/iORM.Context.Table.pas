@@ -128,17 +128,25 @@ type
   // Classe che incapsula le info sulla tabella
   TioTable = class(TioSqlItem, IioTable)
   strict private
-    FMapMode: TioMapModeType;
-    FTrueClass: IioTrueClass;
-    FJoins: IioJoins;
-    FGroupBy: IioGroupBy;
     FConnectionDefName_DoNotCallDirectly: String;
-    FKeyGenerator: String;
-    FRttiType: TRttiInstanceType;
-    FIndexList: TioIndexList;
     FContainsSomeIioListProperty: Boolean;
     FEtmTimeSlotClass: TioEtmTimeSlotRef;
     FEtmTraceOnlyOnConnectionName: String;
+    FEtmPropToPropList: TEtmPropToPropList;
+    FGroupBy: IioGroupBy;
+    FIndexList: TioIndexList;
+    FJoins: IioJoins;
+    FKeyGenerator: String;
+    FMapMode: TioMapModeType;
+    FRttiType: TRttiInstanceType;
+    FTrueClass: IioTrueClass;
+    // Conflict strategies
+    FDeleteConflictStrategy: TClass; // TClass instead of TioCustomConflictStrategyRef to avoid circular reference
+    FDeleteConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState;
+    FInsertConflictStrategy: TClass; // TClass instead of TioCustomConflictStrategyRef to avoid circular reference
+    FInsertConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState;
+    FUpdateConflictStrategy: TClass; // TClass instead of TioCustomConflictStrategyRef to avoid circular reference
+    FUpdateConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState;
     // EtmTimeSlotClass
     procedure SetEtmTimeSlotClass(const AEtmTimeSlotClass: TioEtmTimeSlotRef);
     function GetEtmTimeSlotClass: TioEtmTimeSlotRef;
@@ -149,35 +157,50 @@ type
     constructor Create(const ASqlText, AKeyGenerator: String; const ATrueClass: IioTrueClass; const AJoins: IioJoins; const AGroupBy: IioGroupBy;
       const AConnectionDefName: String; const AMapMode: TioMapModeType; const ARttiType: TRttiInstanceType); reintroduce; overload;
     destructor Destroy; override;
-    /// This method create the TrueClassVirtualMap.Table object duplicating something of itself
+    // This method create the TrueClassVirtualMap.Table object duplicating something of itself
     function DuplicateForTrueClassMap: IioTable;
+    function GetClassName: String;
+    function GetConnectionDefName: String;
+    function GetGroupBy: IioGroupBy;
+    function GetJoin: IioJoins;
+    function GetKeyGenerator: String;
+    function GetMapMode: TioMapModeType;
+    function GetQualifiedClassName: String;
+    function GetRttiType: TRttiInstanceType;
     function GetSql: String; override;
     function GetTrueClass: IioTrueClass;
+    function IsForThisConnection(AConnectionDefNameToCheck: String): Boolean;
+    function IsNotPersistedEntity: Boolean;
     function IsTrueClass: Boolean;
     function TableName: String;
-    function GetKeyGenerator: String;
-    function GetJoin: IioJoins;
-    function GetGroupBy: IioGroupBy;
-    function GetConnectionDefName: String;
-    function IsForThisConnection(AConnectionDefNameToCheck: String): Boolean;
-    function GetMapMode: TioMapModeType;
-    function GetRttiType: TRttiInstanceType;
-    function IsNotPersistedEntity: Boolean;
-    function GetClassName: String;
-    function GetQualifiedClassName: String;
+    // Conflict strategies (TClass instead of TioCustomConflictStrategyRef to avoid circular reference)
+    procedure SetDeleteConflictStrategy(const AConflictStrategy: TClass);
+    procedure SetInsertConflictStrategy(const AConflictStrategy: TClass);
+    procedure SetUpdateConflictStrategy(const AConflictStrategy: TClass);
+    procedure SetDeleteConflictStrategy_OnConflictSetStateAs(const Value: TioPersistenceConflictState);
+    procedure SetInsertConflictStrategy_OnConflictSetStateAs(const Value: TioPersistenceConflictState);
+    procedure SetUpdateConflictStrategy_OnConflictSetStateAs(const Value: TioPersistenceConflictState);
+    function GetDeleteConflictStrategy: TClass;
+    function GetInsertConflictStrategy: TClass;
+    function GetUpdateConflictStrategy: TClass;
+    function GetDeleteConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState;
+    function GetInsertConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState;
+    function GetUpdateConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState;
     // IndexList
     function IndexListExists: Boolean;
     function GetIndexList(AAutoCreateIfUnassigned: Boolean): TioIndexList;
     procedure SetIndexList(AIndexList: TioIndexList);
-    // Properties
-    property EtmTimeSlotClass: TioEtmTimeSlotRef read GetEtmTimeSlotClass write SetEtmTimeSlotClass;
-    property EtmTraceOnlyOnConnectionName: String read GetEtmTraceOnlyOnConnectionName write SetEtmTraceOnlyOnConnectionName;
+    // ETM prop to prop list
+    function EtmPropToPropListExists: Boolean;
+    function GetEtmPropToPropList(AAutoCreateIfUnassigned: Boolean): TEtmPropToPropList;
+    procedure SetEtmPropToPropList(AEtmPropToPropList: TEtmPropToPropList);
   end;
 
 implementation
 
 uses
-  iORM.DB.Factory, System.SysUtils, iORM.Exceptions, iORM.SqlTranslator, System.StrUtils;
+  iORM.DB.Factory, System.SysUtils, iORM.Exceptions, iORM.SqlTranslator, System.StrUtils,
+  iORM.ConflictStrategy.SameVersionWin;
 
 { TioContextTable }
 
@@ -202,21 +225,43 @@ begin
   FGroupBy := AGroupBy;
   if Assigned(FGroupBy) then
     FGroupBy.SetTable(Self);
+  // Conflict strategies
+  FDeleteConflictStrategy := TioSameVersionWin;
+  FInsertConflictStrategy := TioSameVersionWin;
+  FUpdateConflictStrategy := TioSameVersionWin;
+  FDeleteConflictStrategy_OnConflictSetStateAs := csResolved;
+  FInsertConflictStrategy_OnConflictSetStateAs := csResolved;
+  FUpdateConflictStrategy_OnConflictSetStateAs := csResolved;
   // ETM
   FEtmTimeSlotClass := nil;
   FEtmTraceOnlyOnConnectionName := String.Empty;
+  FEtmPropToPropList := nil;
 end;
 
 destructor TioTable.Destroy;
 begin
-  if Self.IndexListExists then
+  if Assigned(FIndexList) then
     FIndexList.Free;
+  if Assigned(FEtmPropToPropList) then
+    FEtmPropToPropList.Free;
   inherited;
 end;
 
 function TioTable.DuplicateForTrueClassMap: IioTable;
 begin
   Result := TioTable.Create(FSqlText, FKeyGenerator, FTrueClass, FJoins, FGroupBy, FConnectionDefName_DoNotCallDirectly, FMapMode, FRttiType);
+end;
+
+function TioTable.GetEtmPropToPropList(AAutoCreateIfUnassigned: Boolean): TEtmPropToPropList;
+begin
+  if AAutoCreateIfUnassigned and not Assigned(FEtmPropToPropList) then
+    FEtmPropToPropList := TEtmPropToPropList.Create;
+  Result := FEtmPropToPropList;
+end;
+
+function TioTable.EtmPropToPropListExists: Boolean;
+begin
+  Result := Assigned(FEtmPropToPropList);
 end;
 
 function TioTable.IsNotPersistedEntity: Boolean;
@@ -234,9 +279,32 @@ begin
   Result := FRttiType.Name;
 end;
 
+function TioTable.GetDeleteConflictStrategy: TClass;
+begin
+  Result := FDeleteConflictStrategy;
+end;
+
+function TioTable.GetDeleteConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState;
+begin
+  Result := FDeleteConflictStrategy_OnConflictSetStateAs;
+end;
+
+function TioTable.GetUpdateConflictStrategy: TClass;
+begin
+  Result := FUpdateConflictStrategy;
+end;
+
+function TioTable.GetUpdateConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState;
+begin
+  Result := FUpdateConflictStrategy_OnConflictSetStateAs;
+end;
+
 function TioTable.GetConnectionDefName: String;
 begin
-  Result := TioDBFActory.ConnectionManager.GetCurrentConnectionNameIfEmpty(FConnectionDefName_DoNotCallDirectly);
+  // Carlo Marona (2025-10-15): Why returns the default connection name if the table is not specifically associated with a connection def???????
+  // It should return FConnectionDefName_DoNotCallDirectly that is the name of the connection the table was specifically associated if it is.
+  //Result := TioDBFActory.ConnectionManager.GetCurrentConnectionNameIfEmpty(FConnectionDefName_DoNotCallDirectly);
+  Result := FConnectionDefName_DoNotCallDirectly;
 end;
 
 function TioTable.GetEtmTimeSlotClass: TioEtmTimeSlotRef;
@@ -256,9 +324,19 @@ end;
 
 function TioTable.GetIndexList(AAutoCreateIfUnassigned: Boolean): TioIndexList;
 begin
-  if AAutoCreateIfUnassigned and (not Self.IndexListExists) then
+  if AAutoCreateIfUnassigned and not Assigned(FIndexList) then
     FIndexList := TioIndexList.Create;
   Result := FIndexList;
+end;
+
+function TioTable.GetInsertConflictStrategy: TClass;
+begin
+  Result := FInsertConflictStrategy;
+end;
+
+function TioTable.GetInsertConflictStrategy_OnConflictSetStateAs: TioPersistenceConflictState;
+begin
+  Result := FInsertConflictStrategy_OnConflictSetStateAs;
 end;
 
 function TioTable.GetJoin: IioJoins;
@@ -330,6 +408,41 @@ end;
 procedure TioTable.SetIndexList(AIndexList: TioIndexList);
 begin
   FIndexList := AIndexList;
+end;
+
+procedure TioTable.SetInsertConflictStrategy(const AConflictStrategy: TClass);
+begin
+  FInsertConflictStrategy := AConflictStrategy;
+end;
+
+procedure TioTable.SetInsertConflictStrategy_OnConflictSetStateAs(const Value: TioPersistenceConflictState);
+begin
+  FInsertConflictStrategy_OnConflictSetStateAs := Value;
+end;
+
+procedure TioTable.SetEtmPropToPropList(AEtmPropToPropList: TEtmPropToPropList);
+begin
+  FEtmPropToPropList := AEtmPropToPropList;
+end;
+
+procedure TioTable.SetDeleteConflictStrategy(const AConflictStrategy: TClass);
+begin
+  FDeleteConflictStrategy := AConflictStrategy;
+end;
+
+procedure TioTable.SetDeleteConflictStrategy_OnConflictSetStateAs(const Value: TioPersistenceConflictState);
+begin
+  FDeleteConflictStrategy_OnConflictSetStateAs := Value;
+end;
+
+procedure TioTable.SetUpdateConflictStrategy(const AConflictStrategy: TClass);
+begin
+  FUpdateConflictStrategy := AConflictStrategy;
+end;
+
+procedure TioTable.SetUpdateConflictStrategy_OnConflictSetStateAs(const Value: TioPersistenceConflictState);
+begin
+  FUpdateConflictStrategy_OnConflictSetStateAs := Value;
 end;
 
 function TioTable.TableName: String;

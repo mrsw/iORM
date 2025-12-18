@@ -81,6 +81,7 @@ type
     procedure ParamByProp_SetValueAsTime(const AProp: IioProperty; const AValue: TTime);
     procedure ParamByProp_SetValueAsFloat(const AProp: IioProperty; const AValue: Double);
     procedure ParamByProp_SetValueByContext(const AProp: IioProperty; const AContext: IioContext);
+    procedure ParamByProp_SetValueAsInteger(const AProp: IioProperty; const AValue: Integer);
     procedure ParamByProp_SetValueAsIntegerNullIfZero(const AProp: IioProperty; const AValue: Integer);
     procedure ParamByProp_LoadAsStreamObj(const AObj: TObject; const AProperty: IioProperty);
     procedure ParamObjVersion_SetValue(const AContext: IioContext);
@@ -304,7 +305,7 @@ begin
   AParam := Self.FSqlQuery.ParamByName(AProperty.GetSqlParamName);
 //  AParam := (FSqlQuery as IProviderSupportNG).PSGetParams.ParamByName(AProperty.GetSqlParamName);
   if not Assigned(AParam) then
-    raise EioException.Create(Self.ClassName + ': ' + AProperty.GetSqlParamName + ' Sql parameter not found');
+    raise EioGenericException.Create(Self.ClassName + ': ' + AProperty.GetSqlParamName + ' Sql parameter not found');
 
   // If AObj is a TStream then use it directly else wrap it with a
   // DuckTypedSTreamObject wrapper, extract the stream and then use it.
@@ -351,6 +352,11 @@ begin
     end;
   end;
   // -------------------------------------------------------------------------------------------------------------------------------
+end;
+
+procedure TioFDQuery.ParamByProp_SetValueAsInteger(const AProp: IioProperty; const AValue: Integer);
+begin
+  _ParamByProp(AProp).AsInteger := AValue;
 end;
 
 procedure TioFDQuery.ParamByProp_SetValueAsIntegerNullIfZero(const AProp: IioProperty; const AValue: Integer);
@@ -415,7 +421,7 @@ var
   LProp: IioProperty;
 begin
   LProp := AContext.GetProperties.ObjVersionProperty;
-  ParamByProp_SetValueAsIntegerNullIfZero(LProp, AContext.NextObjVersion(False));
+  ParamByProp_SetValueAsIntegerNullIfZero(LProp, AContext.ObjNextVersion);
 end;
 
 procedure TioFDQuery.WhereParamObjVersion_SetValue(const AContext: IioContext);
@@ -423,7 +429,7 @@ var
   LProp: IioProperty;
 begin
   LProp := AContext.GetProperties.ObjVersionProperty;
-  WhereParamByProp_SetValue(LProp, LProp.GetValue(AContext.DataObject).AsVariant);
+  WhereParamByProp_SetValue(LProp, Abs(LProp.GetValue(AContext.DataObject).AsVariant));
 end;
 
 procedure TioFDQuery.ParamByProp_SetValueByContext(const AProp: IioProperty; const AContext: IioContext);
@@ -448,7 +454,7 @@ begin
   // If a RelationChildPropertyPath is assigned then resolve it
   LObj := AProp.GetValueAsObject(AContext.DataObject);
   if AProp.RelationChildPropertyPathAssigned then
-    LObj := TioUtilities.ResolveChildPropertyPath(LObj, AProp.GetRelationChildPropertyPath);
+    LObj := TioUtilities.ResolveChildPropertyPath_GetFinalObj(LObj, AProp.GetRelationChildPropertyPath);
   if not Assigned(LObj) then
   begin
     ParamByProp_Clear(AProp, ftBlob);
@@ -539,3 +545,4 @@ begin
 end;
 
 end.
+

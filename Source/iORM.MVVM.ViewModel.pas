@@ -135,7 +135,7 @@ begin
     Exit(GetDefaultPresenter);
   LComponent := FindComponent(AName);
   if not(Assigned(LComponent) and (LComponent is TioModelPresenterCustom)) then
-    raise EioException.Create(Self.ClassName, 'GetPresenters', Format('ModelPresenter named "%s" not found.', [AName]));
+    raise EioGenericException.Create(Self.ClassName, 'GetPresenters', Format('ModelPresenter named "%s" not found.', [AName]));
   Result := TioModelPresenterCustom(LComponent);
 end;
 
@@ -222,6 +222,9 @@ end;
 
 destructor TioViewModel.Destroy;
 begin
+  FVMActionContainer := nil;        // Added by Carlo Marona 2025/02/25
+  FViewRegister := nil;             // Added by Carlo Marona 2025/02/25
+  FLocalVCProviderRegister := nil;  // Added by Carlo Marona 2025/02/25
 
   inherited;
 end;
