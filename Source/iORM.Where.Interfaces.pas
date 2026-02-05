@@ -227,6 +227,7 @@ type
     function _Where(AWhereCond: IioWhere): IioWhere; overload;
     function _Where(ATextCondition: String): IioWhere; overload;
     function _Where(const APropertyName: String; const ACompareOp: TioCompareOp): IioWhere; overload;
+    function _Where(const APropertyName: String; const ACompareOp: TioCompareOp; const AValue: TValue): IioWhere; overload;
     function _Where(const APropertyName: String; const ACompareOp: TioCompareOp; const AValue: Variant): IioWhere; overload;
     function _Where(const APropertyName: String; const ACompareOp: TioCompareOp; const AValue: TObject): IioWhere; overload;
     function _Where(const APropertyName: String; const ACompareOp: TioCompareOp; const AValue: IInterface): IioWhere; overload;
