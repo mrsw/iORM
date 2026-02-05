@@ -191,9 +191,10 @@ begin
 {$IFDEF CONSOLE}
   FFDGUIxWaitCursor.Provider := 'Console';
 {$ELSE}
-  {$IFDEF ioVCL}
+  {$IFDEF FRAMEWORK_VCL}
     FFDGUIxWaitCursor.Provider := 'Forms';
-  {$ELSE}
+  {$ENDIF}
+  {$IFDEF FRAMEWORK_FMX}
     FFDGUIxWaitCursor.Provider := 'FMX';
   {$ENDIF}
 {$ENDIF}
