@@ -45,7 +45,7 @@ type
   TioUtilities = class
   private
     class function _ExtractAttributeInfoSign(const ARttiInstanceType: TRttiInstanceType): String;
- public
+  public
     class function ObjectAsIInterface(const AObj: Tobject): IInterface; static;
     class function ObjectAsIioViewModel(const AObj: Tobject): IioViewModel; static;
     class function IsAnInterface<T>: Boolean; static;
