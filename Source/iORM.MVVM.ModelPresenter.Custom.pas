@@ -107,6 +107,13 @@ type
     procedure WhereOnChangeEventHandler(Sender: TObject);
     procedure OpenCloseViewBindSources(const AActive: Boolean);
     procedure OpenCloseDetails(const AActive: Boolean);
+    // Carlo Marona (2026-02-06)
+    // This method seems to be equal to OpenCloseDetails but it isn't.
+    // The OpenCloseDetails method open or close details BindSources accordingly to AActive parameter. If AActive is true
+    // and the BindSource is already active, its open method skips.
+    // The RefreshDetails method, saves actual active status and then forces close of the BindSource the reopen it based
+    // on previous active state
+    procedure RefreshDetails;   // Carlo Marona (2026-02-06)
     // AsDefault
     function GetAsDefault: Boolean;
     procedure SetAsDefault(const Value: Boolean);
@@ -997,6 +1004,26 @@ begin
     FBindSourceAdapter.Refresh(ANotify);
 end;
 
+procedure TioModelPresenterCustom.RefreshDetails;
+var
+  LDetailBindSource: IioBindSource;
+  LIsActive: Boolean;
+begin
+  if Assigned(FDetailBindSourceContainer) then
+  begin
+    for LDetailBindSource in FDetailBindSourceContainer do
+    begin
+      LIsActive := LDetailBindSource.IsActive;
+
+      if LIsActive then
+      begin
+        LDetailBindSource.Close;
+        LDetailBindSource.Open;
+      end;
+    end;
+  end;
+end;
+
 procedure TioModelPresenterCustom.RegisterDetailBindSource(const ADetailBindSource: IioBindSource);
 begin
   if not Assigned(FDetailBindSourceContainer) then
@@ -1060,6 +1087,10 @@ begin
   begin
     // Open/Close registered details model presenters
     OpenCloseDetails(Value);
+
+    // Carlo Marona (2026-02-06)
+    RefreshDetails;
+    
     if Value then
       DoAfterOpen
     else
