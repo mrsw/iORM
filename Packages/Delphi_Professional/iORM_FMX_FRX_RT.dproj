@@ -131,6 +131,7 @@
         <DCCReference Include="FMXfsTee28.dcp"/>
         <DCCReference Include="iORM_FMX_RT.dcp"/>
         <DCCReference Include="..\..\Source\iORM.MVVM.FMX.FastReportModelPresenter.pas"/>
+        <DCCReference Include="..\..\Source\iORM.MVVM.FMX.FastReportDataset.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

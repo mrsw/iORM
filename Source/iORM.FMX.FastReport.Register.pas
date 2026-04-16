@@ -11,7 +11,8 @@ uses
   System.Classes,
   FMX.Controls,
 
-  iORM.MVVM.FMX.FastReportModelPresenter
+  iORM.MVVM.FMX.FastReportModelPresenter,
+  iORM.MVVM.FMX.FastReportDataset
 
   ;
 
@@ -21,7 +22,8 @@ uses
 procedure Register;
 begin
   GroupDescendentsWith(TioFastReportModelPresenterDataset, FMX.Controls.TControl);
-  RegisterComponents('iORM - FastReport', [TioFastReportModelPresenterDataset]);
+  GroupDescendentsWith(TioFastReportDatasetDataset, FMX.Controls.TControl);
+  RegisterComponents('iORM - FastReport', [TioFastReportModelPresenterDataset, TioFastReportDatasetDataset]);
 end;
 
 
