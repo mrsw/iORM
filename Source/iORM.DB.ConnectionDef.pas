@@ -342,7 +342,11 @@ begin
 
   if not LAbort then
   begin
-    LDBBuilderEngine.CreateOrUpdateDB(AForce, LScript);
+    case LStatus of
+      stClean: ;
+      stUpdate: LDBBuilderEngine.UpdateDB(AForce);
+      stCreate: LDBBuilderEngine.CreateDB(AForce);
+    end;
 
     // Carlo Marona
     if Assigned(FOnAfterCreateOrAlterDBEvent) then
