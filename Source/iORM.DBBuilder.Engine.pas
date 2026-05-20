@@ -57,6 +57,7 @@ type
     function GetWarnings: TStrings;
     function GetSchema: IioDBBuilderSchema;
     function GetAnalyzed: boolean;
+    procedure RemoveDatabase;
   protected
   public
     constructor Create(const AConnectionDefName: String; const AddIndexes, AddForeignKeys: Boolean);
@@ -90,12 +91,13 @@ type
     /// <param name="AScript">The script where sql instructions will be returned.</param>
     /// </summary>
     procedure BuildUpdateDBSqlScript(const AScript: IioDBBuilderSqlScript);
+    procedure CreateDB(const Force: Boolean = False; const ASQLScript: TStrings = nil);
     /// <summary>
     ///  Creates or update the database depending on the actual schema/database status.
     ///  No need to call Analyze because it is called internally.
     /// <param name="Force">Forces the execution regardless of the schema status.</param>
     /// </summary>
-    procedure CreateOrUpdateDB(const Force: Boolean = False; const AScript: IioDBBuilderSqlScript = nil); overload;
+    procedure CreateOrUpdateDB(const Force: Boolean = False);
     /// <summary>
     ///  Creates or update the the table depending on the actual schema status.
     /// <param name="ATable">Schema of the table to be created/updated.</param>
@@ -112,6 +114,7 @@ type
     /// </summary>
     procedure CreateTable(const ATable: IioDBBuilderSchemaTable; const AddIndexes: Boolean = True;
       const AddForeignKeys: Boolean = True);
+    procedure UpdateDB(const Force: Boolean = False; const ASQLScript: TStrings = nil);
     /// <summary>
     ///  Updates the table using the schema passed.
     /// <param name="ATable">Schema of the table to be created/updated.</param>
@@ -218,55 +221,72 @@ procedure TioDBBuilderEngine.CreateDatabase;
 var
   LStrategy: IioDBBuilderStrategy;
 begin
-  if not Analyzed then
-    raise EioGenericException.Create(ClassName, 'CreateDatabase', 'Unable to create database: schema not analyzed');
+//  if not Analyzed then
+//    raise EioGenericException.Create(ClassName, 'CreateDatabase', 'Unable to create database: schema not analyzed');
 
   LStrategy := TioDBBuilderFactory.NewStrategy(FConnectionDefName, FSchema, FSqlGenerator);
   LStrategy.CreateDatabase;
 end;
 
-procedure TioDBBuilderEngine.CreateOrUpdateDB(const Force: Boolean; const AScript: IioDBBuilderSqlScript);
+procedure TioDBBuilderEngine.CreateDB(const Force: Boolean = False; const ASQLScript: TStrings = nil);
 var
+  LDatabaseExists: boolean;
+  LRemoveDataBase: boolean;
   LScript: IioDBBuilderSqlScript;
   LBuildScript: boolean;
   LStatus: TioDBBuilderStatus;
+  LStrategy: IioDBBuilderStrategy;
 begin
-  LBuildScript := not Assigned(AScript);
+  LStrategy := TioDBBuilderFactory.NewStrategy(FConnectionDefName, FSchema, FSqlGenerator);
+  LDatabaseExists := LStrategy.DatabaseExists;
 
-  // Carlo Marona (2025-10-15): Do not pass Force param of this method to Analyze method. They have different behavior
+  if LDatabaseExists and not Force then
+    exit;
+
+  LRemoveDatabase := LDatabaseExists and Force;
+  LBuildScript := not Assigned(ASqlScript);
+
   if LBuildScript then
+    // If the script must be build, the status is that returned by the Analyze method.
+    // If the script has been passed, the intent is to create the database schema based on passed script, so the status
+    // is forced to "create".
     LStatus := Analyze
   else
-    LStatus := Schema.Status;
+    LStatus := TioDBBuilderStatus.stCreate;
+
+  if LStatus = TioDBBuilderStatus.stCreate then
+  begin
+    // If database exists and force, remove it
+    if LRemoveDatabase then
+      RemoveDatabase;
+
+    // Carlo Marona: create the database fisically, on the server or as a file depending on database type used
+    CreateDatabase;
+
+    if LBuildScript then
+    begin
+      LScript := TioDBBuilderFactory.NewSqlScript;
+      BuildCreateDBSqlScript(LScript);
+      TioDBFactory.Script(FConnectionDefName, LScript.SQL).Execute;
+    end
+    else
+      TioDBFactory.Script(FConnectionDefName, ASQLScript).Execute;
+  end;
+end;
+
+procedure TioDBBuilderEngine.CreateOrUpdateDB(const Force: Boolean);
+var
+  LScript: IioDBBuilderSqlScript;
+  LStatus: TioDBBuilderStatus;
+begin
+  LStatus := Analyze;
 
   if (LStatus > stClean) or Force then
   begin
-    if Schema.WarningExists then
-      raise EioGenericException.Create(ClassName, 'CreateOrUpdateDB',
-        'Database must be updated but WARNINGS exists.' + sLineBreak +
-        FSchema.Warnings.Text
-      );
-
-    if LBuildScript then
-      LScript := TioDBBuilderFactory.NewSqlScript
-    else
-      LScript := AScript;
-
-    if LStatus = stCreate then
-    begin
-      // Carlo Marona: create the database fisically, on the server or as a file depending on database type used
-      CreateDatabase;
-
-      if LBuildScript then
-        BuildCreateDBSqlScript(LScript);
-    end
-    else if LStatus = stUpdate then
-    begin
-      if LBuildScript then
-        BuildUpdateDBSqlScript(LScript);
+    case LStatus of
+      stUpdate: UpdateDB(Force);
+      stCreate: CreateDB(Force);
     end;
-
-    TioDBFactory.Script(FConnectionDefName, LScript.SQL).Execute;
   end;
 end;
 
@@ -318,6 +338,53 @@ end;
 function TioDBBuilderEngine.GetWarnings: TStrings;
 begin
   Result := FSchema.Warnings;
+end;
+
+procedure TioDBBuilderEngine.RemoveDatabase;
+begin
+  { TODO : Implement remove database method }
+  raise ENotImplemented.Create('TioDBBuilderEngine.RemoveDatabase: Not yet implmenetnted.');
+end;
+
+procedure TioDBBuilderEngine.UpdateDB(const Force: Boolean = False; const ASQLScript: TStrings = nil);
+var
+  LScript: IioDBBuilderSqlScript;
+  LBuildScript: boolean;
+  LStatus: TioDBBuilderStatus;
+  LStrategy: IioDBBuilderStrategy;
+begin
+  LStrategy := TioDBBuilderFactory.NewStrategy(FConnectionDefName, FSchema, FSqlGenerator);
+
+  if LStrategy.DatabaseExists and not Force then
+    exit;
+
+  LBuildScript := not Assigned(ASQLScript);
+
+  if LBuildScript then
+    // If the script must be build, the status is that returned by the Analyze method.
+    // If the script has been passed, the intent is to create the database schema based on passed script, so the status
+    // is forced to "create".
+    LStatus := Analyze
+  else
+    LStatus := TioDBBuilderStatus.stUpdate;
+
+  if LStatus = TioDBBuilderStatus.stUpdate then
+  begin
+    if Schema.WarningExists then
+      raise EioGenericException.Create(ClassName, 'UpdateDB',
+        'Database must be updated but WARNINGS exists.' + sLineBreak +
+        FSchema.Warnings.Text
+      );
+
+    if LBuildScript then
+    begin
+      LScript := TioDBBuilderFactory.NewSqlScript;
+      BuildUpdateDBSqlScript(LScript);
+      TioDBFactory.Script(FConnectionDefName, LScript.SQL).Execute;
+    end
+    else
+      TioDBFactory.Script(FConnectionDefName, ASQLScript).Execute;
+  end;
 end;
 
 procedure TioDBBuilderEngine.UpdateTable(const ATable: IioDBBuilderSchemaTable; const AddIndexes: Boolean;
