@@ -92,6 +92,7 @@ begin
     Result := True;
   except
     FConnectionComponent.Rollback;
+    raise;
   end;
 end;
 
