@@ -1058,7 +1058,15 @@ begin
   begin
     FViewBindSourceContainer.Add(AModelBindSourceOrModelDataSet);
     if IsActive then
-      (AModelBindSourceOrModelDataSet as IioVMBridgeClientComponent).Open
+      // Carlo Marona (2026-06-22): ForceQueue defers Open until after Loaded
+      // completes so that FioLoaded = True when _CreateAdapter is reached.
+      // Without the deferral the bail-out guard in TioModelBindSource._CreateAdapter
+      // exits early and the bind source never acquires an adapter.
+      TThread.ForceQueue(nil,
+        procedure
+        begin
+          (AModelBindSourceOrModelDataSet as IioVMBridgeClientComponent).Open;
+        end)
     else
       (AModelBindSourceOrModelDataSet as IioVMBridgeClientComponent).Close;
   end;
