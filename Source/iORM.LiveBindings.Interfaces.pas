@@ -79,6 +79,7 @@ type
     function CheckAdapter: Boolean; overload;
     function CheckAdapter(const ACreateIfNotAssigned: Boolean): Boolean; overload;
     function CheckActiveAdapter: Boolean;
+    function HasActiveAdapter: Boolean;
     function Current: TObject;
     function GetActiveBindSourceAdapter: IioActiveBindSourceAdapter;
     function GetMasterPropertyName: String;
@@ -329,8 +330,8 @@ type
     property LazyProps: String read GetLazyProps write SetLazyProps;
     property LoadType: TioLoadType read GetLoadType write SetLoadType;
     property AutoLoad: Boolean read GetAutoLoad;
-    property ioAutoPost: Boolean read GetioAutoPost write SetioAutoPost; // Lascio il nome a ioAutoPost perchè c'è già un AutoPost negli antenati
-    property ioOwnsObjects: Boolean read GetOwnsObjects; // Lascio il nome a ioAutoPost perchè c'è già un AutoPost negli antenati
+    property ioAutoPost: Boolean read GetioAutoPost write SetioAutoPost; // Lascio il nome a ioAutoPost perchï¿½ c'ï¿½ giï¿½ un AutoPost negli antenati
+    property ioOwnsObjects: Boolean read GetOwnsObjects; // Lascio il nome a ioAutoPost perchï¿½ c'ï¿½ giï¿½ un AutoPost negli antenati
     property TypeAlias: String read GetTypeAlias write SetTypeAlias;
     property TypeName: String read GetTypeName write SetTypeName;
     property ioWhere: IioWhere read GetWhere write SetWhere;

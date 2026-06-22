@@ -257,7 +257,8 @@ end;
 
 function TInterfaceListBindSourceAdapter<T>.GetCanActivate: Boolean;
 begin
-  Result := FList <> nil;
+  // Always activatable: nil list (no master selection) shows 0 rows; returning False causes "No adapter" in the view bind source.
+  Result := True;
 end;
 
 function TInterfaceListBindSourceAdapter<T>.GetCanApplyUpdates: Boolean;

@@ -71,8 +71,8 @@ type
     FSelectorFor: IioBindSource;
     FOnReceiveSelectionCloneObject: Boolean;
     FOnReceiveSelectionFreeObject: Boolean;
-    // Questà è una collezione dove eventuali BindSource di dettaglio
-    // si registrano per rendere nota la loro esistenza al Master. Sarà poi
+    // Questï¿½ ï¿½ una collezione dove eventuali BindSource di dettaglio
+    // si registrano per rendere nota la loro esistenza al Master. Sarï¿½ poi
     // usata dal Master per fare in modo che, quando viene richiesta la creazione
     // del suo BindSourceAdapter (del master), venga scatenata anche la creazione
     // anche di tutti gli adapters relativi ai presenters di dettaglio (che si sono
@@ -197,6 +197,7 @@ type
     procedure SetActive(const Value: Boolean); override;
     procedure Loaded; override;
     function CheckActiveAdapter: Boolean;
+    function HasActiveAdapter: Boolean;
     function GetName: String;
     procedure DoAfterClose;
     procedure DoAfterOpen;
@@ -230,7 +231,7 @@ type
     property LazyProps: String read FLazyProps write SetLazyProps; // published: Master
     property VirtualFields: Boolean read GetVirtualFields write FVirtualFields default False;
     property ETMfor: IioMasterBindSource read GetETMfor write SetETMfor;
-    // published: Master (però cambiarlo in modo che, se true, persiste al cambio di record)
+    // published: Master (perï¿½ cambiarlo in modo che, se true, persiste al cambio di record)
     property TypeOfCollection: TioTypeOfCollection read GetTypeOfCollection write SetTypeOfCollection default tcList;
     // published: Master+Detail (si potrebbe fare una rilevazione automatica?)
     property WhereStr: TStrings read FWhereStr write SetWhereStr; // published: Master
@@ -355,8 +356,8 @@ begin
   if CheckActiveAdapter and Supports(Self.GetInternalAdapter, IioActiveBindSourceAdapter, AnActiveBSA) then
   begin
     AnActiveBSA.Append(AObject);
-    // NB: HO commentato la riga sotto perchè Marco Mottadelli mi ha segnalato che causava
-    // il fatto che lo stato del componente passava subito a "Browse" perchè veniva
+    // NB: HO commentato la riga sotto perchï¿½ Marco Mottadelli mi ha segnalato che causava
+    // il fatto che lo stato del componente passava subito a "Browse" perchï¿½ veniva
     // invocato un Post in seguito al Refresh stesso.
     // AnActiveBSA.Refresh(False);
   end
@@ -371,8 +372,8 @@ begin
   if CheckActiveAdapter and Supports(Self.GetInternalAdapter, IioActiveBindSourceAdapter, AnActiveBSA) then
   begin
     AnActiveBSA.Append(AObject);
-    // NB: HO commentato la riga sotto perchè Marco Mottadelli mi ha segnalato che causava
-    // il fatto che lo stato del componente passava subito a "Browse" perchè veniva
+    // NB: HO commentato la riga sotto perchï¿½ Marco Mottadelli mi ha segnalato che causava
+    // il fatto che lo stato del componente passava subito a "Browse" perchï¿½ veniva
     // invocato un Post in seguito al Refresh stesso.
     // AnActiveBSA.Refresh(False);
   end
@@ -395,6 +396,11 @@ end;
 function TioPrototypeBindSourceCustom.CheckActiveAdapter: Boolean;
 begin
   Result := GetActiveBindSourceAdapter <> nil;
+end;
+
+function TioPrototypeBindSourceCustom.HasActiveAdapter: Boolean;
+begin
+  Result := Assigned(FBindSourceAdapter);
 end;
 
 function TioPrototypeBindSourceCustom.CheckAdapter(const ACreateIfNotAssigned: Boolean): Boolean;
@@ -440,8 +446,8 @@ begin
   FWhereDetailsFromDetailAdapters := False;
   FWhereStr := TStringList.Create;
   SetWhereStr(FWhereStr); // set TStringList.onChange event handler
-  // Questà è una collezione dove eventuali BindSources di dettaglio
-  // si registrano per rendere nota la loro esistenza al Master. Sarà poi
+  // Questï¿½ ï¿½ una collezione dove eventuali BindSources di dettaglio
+  // si registrano per rendere nota la loro esistenza al Master. Sarï¿½ poi
   // usata dal Master per fare in modo che, quando viene richiesta la creazione
   // del suo BindSourceAdapter (del master), venga scatenata anche la creazione
   // anche di tutti gli adapters relativi ai presenters di dettaglio (che si sono
@@ -704,8 +710,8 @@ begin
   if CheckActiveAdapter and Supports(Self.GetInternalAdapter, IioActiveBindSourceAdapter, AnActiveBSA) then
   begin
     AnActiveBSA.Insert(AObject);
-    // NB: HO commentato la riga sotto perchè Marco Mottadelli mi ha segnalato che causava
-    // il fatto che lo stato del componente passava subito a "Browse" perchè veniva
+    // NB: HO commentato la riga sotto perchï¿½ Marco Mottadelli mi ha segnalato che causava
+    // il fatto che lo stato del componente passava subito a "Browse" perchï¿½ veniva
     // invocato un Post in seguito al Refresh stesso.
     // AnActiveBSA.Refresh(False);
   end
@@ -730,8 +736,8 @@ begin
   if CheckActiveAdapter and Supports(Self.GetInternalAdapter, IioActiveBindSourceAdapter, AnActiveBSA) then
   begin
     AnActiveBSA.Insert(AObject);
-    // NB: HO commentato la riga sotto perchè Marco Mottadelli mi ha segnalato che causava
-    // il fatto che lo stato del componente passava subito a "Browse" perchè veniva
+    // NB: HO commentato la riga sotto perchï¿½ Marco Mottadelli mi ha segnalato che causava
+    // il fatto che lo stato del componente passava subito a "Browse" perchï¿½ veniva
     // invocato un Post in seguito al Refresh stesso.
     // AnActiveBSA.Refresh(False);
   end
@@ -822,8 +828,8 @@ end;
 
 procedure TioPrototypeBindSourceCustom.Loaded;
 begin
-  // Qui forzo l'AutoPost a True perchè ridichiarare la proprietà con default = True
-  //  non è stato sufficiente anche perchè il getter e setter sono privati e statici nell'antenato.
+  // Qui forzo l'AutoPost a True perchï¿½ ridichiarare la proprietï¿½ con default = True
+  //  non ï¿½ stato sufficiente anche perchï¿½ il getter e setter sono privati e statici nell'antenato.
   AutoPost := True;
 
   // CONNECTIONDEF REGISTRATION (IF NEEDED) MUST BE BEFORE THE DOCREATEADAPTER
@@ -846,9 +852,9 @@ begin
   end;
   // ===========================================================================
 
-  // Qui siamo subito dopo il caricamento dei valori delle proprietà dal file DFM
-  //  e se la proprietà Preview = True scatena il relativo metodo set per far si
-  //  che venga posta a true anche la proprietà AutoActivate e rendere visibile
+  // Qui siamo subito dopo il caricamento dei valori delle proprietï¿½ dal file DFM
+  //  e se la proprietï¿½ Preview = True scatena il relativo metodo set per far si
+  //  che venga posta a true anche la proprietï¿½ AutoActivate e rendere visibile
   //  i dati a desig-time
   SetPreview(Preview);
 
@@ -934,10 +940,10 @@ end;
 
 procedure TioPrototypeBindSourceCustom.SelectCurrent(ASelectionType: TioSelectionType);
 begin
-  // C'era un problema se il target è un BS che espone un singolo oggetto e in
-  //  precedenza era stato impostato il suo dataObject a nil perchè in questo caso negli
+  // C'era un problema se il target ï¿½ un BS che espone un singolo oggetto e in
+  //  precedenza era stato impostato il suo dataObject a nil perchï¿½ in questo caso negli
   //  ObjectBSA il ABSA si disattiva (Active = False) e quindi poi quando faceva
-  //  il SetDataObject sul TargetBSA dava un errore perchè non era attivo.
+  //  il SetDataObject sul TargetBSA dava un errore perchï¿½ non era attivo.
   if not FSelectorFor.IsActive then
     FSelectorFor.Open;
   if IsInterfacePresenting then
@@ -1071,7 +1077,7 @@ begin
       GetActiveBindSourceAdapter.SetDataObject(ADataObject, AOwnsObject)
     else
       _CreateAdapter(ADataObject, AOwnsObject);
-    // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+    // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
     //  altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
     if not IsActive then
       Open;
@@ -1084,9 +1090,9 @@ begin
 //  // If the BS is active then set the DataObject
 //  if IsActive then
 //  begin
-//    // NB: Lasciare commentate le righe qua sotto perchè altrimenti quando
-//    // si faceva un SetDataObject dava un errore perchè la funzione
-//    // CheckActiveAdapter restituiva sempre False perchè non avendo il DataObject
+//    // NB: Lasciare commentate le righe qua sotto perchï¿½ altrimenti quando
+//    // si faceva un SetDataObject dava un errore perchï¿½ la funzione
+//    // CheckActiveAdapter restituiva sempre False perchï¿½ non avendo il DataObject
 //    // assegnato (se prima avevo chiamato il  ClearDataObject)
 //    // if CheckActiveAdapter then
 //    GetActiveBindSourceAdapter.SetDataObject(ADataObject, AOwnsObject)
@@ -1097,9 +1103,9 @@ begin
 //  //  if it is assigned then automatically activated the BindSource otherwise exits immediately
 //  //  because it does not need to do anything (the BindSource is already closed and if the new
 //  //  DataObject is being set to nil...)
-//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
 //  //  altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
-//  // NB: Se il BS non è mai stato attivo prima allora crea anche il relativo ActiveBindSourceAdapter
+//  // NB: Se il BS non ï¿½ mai stato attivo prima allora crea anche il relativo ActiveBindSourceAdapter
 //  else
 //  begin
 //    if Assigned(ADataObject) then
@@ -1122,7 +1128,7 @@ begin
       GetActiveBindSourceAdapter.SetDataObject(ADataObject, AOwnsObject)
     else
       _CreateAdapter(ADataObject as TObject, AOwnsObject);
-    // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+    // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
     //  altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
     if not IsActive then
       Open;
@@ -1135,9 +1141,9 @@ begin
 //  // If the BS is active then set the DataObject
 //  if IsActive then
 //  begin
-//    // NB: Lasciare commentate le righe qua sotto perchè altrimenti quando
-//    // si faceva un SetDataObject dava un errore perchè la funzione
-//    // CheckActiveAdapter restituiva sempre False perchè non avendo il DataObject
+//    // NB: Lasciare commentate le righe qua sotto perchï¿½ altrimenti quando
+//    // si faceva un SetDataObject dava un errore perchï¿½ la funzione
+//    // CheckActiveAdapter restituiva sempre False perchï¿½ non avendo il DataObject
 //    // assegnato (se prima avevo chiamato il  ClearDataObject)
 //    // if CheckActiveAdapter then
 //    GetActiveBindSourceAdapter.SetDataObject(ADataObject, AOwnsObject)
@@ -1148,9 +1154,9 @@ begin
 //  //  if it is assigned then automatically activated the BindSource otherwise exits immediately
 //  //  because it does not need to do anything (the BindSource is already closed and if the new
 //  //  DataObject is being set to nil...)
-//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
 //  //  altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
-//  // NB: Se il BS non è mai stato attivo prima allora crea anche il relativo ActiveBindSourceAdapter
+//  // NB: Se il BS non ï¿½ mai stato attivo prima allora crea anche il relativo ActiveBindSourceAdapter
 //  else
 //  begin
 //    if Assigned(ADataObject) then
@@ -1187,7 +1193,7 @@ begin
   // NB: Mettendo questa linea di codice ho risolto il problema che i ioPBS
   // anche se erano con "AutoActivate=False" quando veniva aperta (caricata)
   // la form che li conteneva a design time apparivano cmq con i dati finti di
-  // prova anzichè rimanere vuoti.
+  // prova anzichï¿½ rimanere vuoti.
   if (csDesigning in ComponentState) then
     Exit;
   // Set the onChange event handler
@@ -1274,7 +1280,7 @@ end;
 procedure TioPrototypeBindSourceCustom.SetPreview(const Value: Boolean);
 begin
   // Se stiamo abilitando la preview e siamo a design time attiva
-  //  la proprietà "AutoActivate" per mostrare i dati anche a design-time
+  //  la proprietï¿½ "AutoActivate" per mostrare i dati anche a design-time
   FPreview := Value;
   AutoActivate := FPreview and (csDesigning in ComponentState);
 end;
