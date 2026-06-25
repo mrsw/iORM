@@ -105,12 +105,6 @@
         <DCCReference Include="Designide.dcp"/>
         <DCCReference Include="iORM_FMX_RT.dcp"/>
         <DCCReference Include="..\..\Source\iORM.FMX.DT.Register.pas"/>
-        <DCCReference Include="..\..\Source\iORM.DT.VMActnListCompEd.pas"/>
-        <DCCReference Include="..\..\Source\iORM.DT.VMActnListEditor.pas">
-            <Form>ioVMActionListEditor</Form>
-            <FormType>dfm</FormType>
-        </DCCReference>
-        <DCCReference Include="..\..\Source\iORM.DT.VMActionEditor.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

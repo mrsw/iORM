@@ -16,12 +16,13 @@ type
 
   TVMBaseForList = class(TioViewModel)
     BSMaster: TioModelPresenterMaster;
+    BSWhere: TioModelPresenterMaster;
+    VMActionList1: TioVMActionList;
     acDelete: TioVMActionBSPersistenceDelete;
     acBack: TioVMActionBSCloseQuery;
     acShowOrSelect: TioVMActionBSShowOrSelect;
     acAdd: TioVMActionBSPersistenceAppend;
     acSelectCurrent: TioVMActionBSSelectCurrent;
-    BSWhere: TioModelPresenterMaster;
     acBuildWhere: TioVMActionBSBuildWhere;
     acClearWhere: TioVMActionBSClearWhere;
     ioVMAction1: TioVMAction;

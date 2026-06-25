@@ -159,6 +159,14 @@
         <DCCReference Include="..\..\Source\iORM.DT.ViewModel.Wizard.Creator.pas"/>
         <DCCReference Include="..\..\Source\iORM.DT.ViewModel.Wizard.pas"/>
         <DCCReference Include="..\..\Source\iORM.DT.Wizard.Utils.pas"/>
+        <DCCReference Include="..\..\Source\iORM.DT.VMActnListCompEd.pas"/>
+        <DCCReference Include="..\..\Source\iORM.DT.VMActnListEditor.pas">
+            <Form>ioVMActionListEditor</Form>
+        </DCCReference>
+        <DCCReference Include="..\..\Source\iORM.DT.VMActnStdActnSelDlg.pas">
+            <Form>ioVMStdActionSelectDialog</Form>
+        </DCCReference>
+        <DCCReference Include="..\..\Source\iORM.DT.VMActionEditor.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

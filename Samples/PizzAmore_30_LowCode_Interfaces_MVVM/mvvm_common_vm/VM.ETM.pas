@@ -18,6 +18,7 @@ type
   [diViewModelFor(TEtmRepository)]
   TVM_ETM = class(TioViewModel)
     BS_ETM: TioModelPresenterMaster;
+    VMActionList1: TioVMActionList;
     acBack: TioVMActionBSCloseQuery;
     acEtmRevertToVersion: TioVMActionBS_ETM_RevertToBindSource;
   private

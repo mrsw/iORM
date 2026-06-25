@@ -170,6 +170,7 @@ object ioVMActionListEditor: TioVMActionListEditor
     object actAddNewStdAction: TAction
       Caption = 'New Standard VMAction...'
       ShortCut = 16429
+      OnExecute = actAddNewStdActionExecute
     end
     object actNewActionFromLastAddedActionClass: TAction
       Caption = 'actNewActionFromLastAddedActionClass'

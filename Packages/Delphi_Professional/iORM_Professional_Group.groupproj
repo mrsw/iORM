@@ -27,9 +27,6 @@
         <Projects Include="iORM_FMX_FRX_DT.dproj">
             <Dependencies/>
         </Projects>
-        <Projects Include="..\..\..\..\..\..\..\..\Desktop\iORM Test\Runtime Pkgs Project\Project1.dproj">
-            <Dependencies/>
-        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>

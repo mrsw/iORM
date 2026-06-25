@@ -43,6 +43,7 @@ type
     actNewActionFromLastAddedActionClass: TAction;
     actNewActionFromLastAddedActionClass1: TMenuItem;
     procedure actAddNewVMActionExecute(Sender: TObject);
+    procedure actAddNewStdActionExecute(Sender: TObject);
     procedure lbCategoriesClick(Sender: TObject);
     procedure actDeleteExecute(Sender: TObject);
     procedure lbActionsClick(Sender: TObject);
@@ -95,10 +96,8 @@ implementation
 
 uses
   Registry,
-
-  iORM.MVVM.ViewModel
-
-  ;
+  iORM.MVVM.ViewModel,
+  iORM.DT.VMActnStdActnSelDlg;
 
 
 const
@@ -111,6 +110,16 @@ const
 procedure TioVMActionListEditor.actAddNewVMActionExecute(Sender: TObject);
 begin
   DoAddNewAction;
+end;
+
+procedure TioVMActionListEditor.actAddNewStdActionExecute(Sender: TObject);
+var
+  LSelectedClasses: TArray<TioVMActionCustomClass>;
+  LActionClass: TioVMActionCustomClass;
+begin
+  LSelectedClasses := TioVMStdActionSelectDialog.Execute(Application);
+  for LActionClass in LSelectedClasses do
+    DoAddNewAction(LActionClass);
 end;
 
 procedure TioVMActionListEditor.actDeleteExecute(Sender: TObject);
@@ -174,7 +183,7 @@ begin
   LAction.Name := GetNewActionName(LActionClass);
   ActionList.AddAction(LAction);
 
-  FLastAddedActionClass := TioVMAction;
+  FLastAddedActionClass := LActionClass;
 
   SaveEditorSettings;
   // When the new action is added it doesn't have a category specified so

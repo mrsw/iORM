@@ -16,6 +16,7 @@ type
 
   TVMBaseForForm = class(TioViewModel)
     BSMaster: TioModelPresenterMaster;
+    VMActionList1: TioVMActionList;
     acPersist: TioVMActionBSPersistencePersist;
     acBack: TioVMActionBSCloseQuery;
     acRevert: TioVMActionBSPersistenceRevertOrDelete;

@@ -677,7 +677,7 @@ type
     property AfterExecute;
     property BeforeExecute;
     property CanExecute;
-    //property OnUpdate; // Lasciarla non visibile, può fare casino in questa particolare action
+    //property OnUpdate; // Lasciarla non visibile, puï¿½ fare casino in questa particolare action
     // properties
     property InjectViewEventHandler: Boolean read FInjectViewEventHandler write FInjectViewEventHandler default True;
     property InjectVMEventHandler: Boolean read FInjectVMEventHandler write FInjectVMEventHandler default True;
@@ -809,10 +809,11 @@ type
   // END: MVVM STANDARD ACTIONS FOR SYNCHRONIZATION PURPOSES
   // =================================================================================================
 
-  procedure RegisterVMActions(const CategoryName: string; const AClasses: array of TioVMActionCustomClass;
-    Resource: TComponentClass);
+  TioEnumVMActionProc = reference to procedure(const ACategoryName: string; AActionClass: TioVMActionCustomClass);
+
+  procedure RegisterVMActions(const ACategoryName: string; const AClasses: array of TioVMActionCustomClass);
   procedure UnRegisterVMActions(const AClasses: array of TioVMActionCustomClass);
-//  procedure EnumRegisteredVMActions(Proc: TEnumActionProc; Info: TEnumActionProcInfo; FrameworkType: string = '');
+  procedure EnumRegisteredVMActions(AProc: TioEnumVMActionProc; const ACategoryFilter: string = '');
 
 
 
@@ -823,19 +824,59 @@ implementation
 uses
   System.SysUtils, iORM.Utilities, iORM.Exceptions, iORM, System.Rtti,
   iORM.RttiContext.Factory, iORM.StdActions.CloseQueryActionRegister,
-  iORM.Abstraction, iORM.ETM.Engine, iORM.StdActions.CommonBehaviour,
+  iORM.ETM.Engine, iORM.StdActions.CommonBehaviour,
   iORM.MVVM.ViewModel;
 
 
-procedure RegisterVMActions(const CategoryName: string; const AClasses: array of TioVMActionCustomClass;
-  Resource: TComponentClass);
-begin
+var
+  GVMActionRegistry: TStringList;
 
+procedure RegisterVMActions(const ACategoryName: string; const AClasses: array of TioVMActionCustomClass);
+var
+  LCategoryIndex: Integer;
+  LClassList: TList<TioVMActionCustomClass>;
+  LClass: TioVMActionCustomClass;
+begin
+  LCategoryIndex := GVMActionRegistry.IndexOf(ACategoryName);
+  if LCategoryIndex < 0 then
+  begin
+    LClassList := TList<TioVMActionCustomClass>.Create;
+    GVMActionRegistry.AddObject(ACategoryName, LClassList);
+  end
+  else
+    LClassList := TList<TioVMActionCustomClass>(GVMActionRegistry.Objects[LCategoryIndex]);
+  for LClass in AClasses do
+    if not LClassList.Contains(LClass) then
+      LClassList.Add(LClass);
 end;
 
 procedure UnRegisterVMActions(const AClasses: array of TioVMActionCustomClass);
+var
+  I: Integer;
+  LClass: TioVMActionCustomClass;
+  LClassList: TList<TioVMActionCustomClass>;
 begin
+  for LClass in AClasses do
+    for I := 0 to GVMActionRegistry.Count - 1 do
+    begin
+      LClassList := TList<TioVMActionCustomClass>(GVMActionRegistry.Objects[I]);
+      LClassList.Remove(LClass);
+    end;
+end;
 
+procedure EnumRegisteredVMActions(AProc: TioEnumVMActionProc; const ACategoryFilter: string = '');
+var
+  I, J: Integer;
+  LClassList: TList<TioVMActionCustomClass>;
+begin
+  for I := 0 to GVMActionRegistry.Count - 1 do
+  begin
+    if (ACategoryFilter <> '') and (GVMActionRegistry[I] <> ACategoryFilter) then
+      Continue;
+    LClassList := TList<TioVMActionCustomClass>(GVMActionRegistry.Objects[I]);
+    for J := 0 to LClassList.Count - 1 do
+      AProc(GVMActionRegistry[I], LClassList[J]);
+  end;
 end;
 
 
@@ -975,7 +1016,7 @@ end;
 procedure TioVMActionCustom._InternalExecute;
 begin
   // NB: Mauri 23/09/2023: Ho eliminato l'evento "OnExecute" da tutte le StdActions quindi in pratica
-  //      questo codice non serve più (per ora lo lascio commentato)
+  //      questo codice non serve piï¿½ (per ora lo lascio commentato)
   // Execute the VMAction.onExecute event if assigned
 //  if Assigned(FOnExecute) then
 //    FOnExecute(Self)
@@ -1062,11 +1103,11 @@ end;
 
 procedure TioVMActionCustom.SetActionList(const Value: TioCustomVMActionList);
 begin
-  if Value <> ActionList then
+  if Value <> FActionList then
   begin
-    if Value <> nil then
-      ActionList.RemoveAction(Self);
-    if Value <> nil then
+    if Assigned(FActionList) then
+      FActionList.RemoveAction(Self);
+    if Assigned(Value) then
       Value.AddAction(Self);
   end;
 end;
@@ -1704,7 +1745,7 @@ end;
 
 function TioVMActionBSCloseQuery.Execute: Boolean;
 begin
-  _ExecuteOriginal;  // Ritorna all'implementazione originale (cioè esegue la action anche se il TargetBindSource non è assegnato)
+  _ExecuteOriginal;  // Ritorna all'implementazione originale (cioï¿½ esegue la action anche se il TargetBindSource non ï¿½ assegnato)
   Result := False;
 end;
 
@@ -1764,10 +1805,10 @@ end;
 function TioVMActionBSCloseQuery._CanClose: Boolean;
 begin
   Result := (TargetBindSource = nil) or TargetBindSource.Persistence.IsEmpty or TargetBindSource.Persistence.CanSaveRevertPoint or (FOnEditingAction <> eaDisable);
-  // Se è il caso interroga anche le ChildCQA
+  // Se ï¿½ il caso interroga anche le ChildCQA
   if FOnUpdateScope in [usGlobal, usDisableIfChilds] then
     Result := Result and TioBSCloseQueryActionRegister.CanClose(Self, FOnUpdateScope = usDisableIfChilds);
-  // se c'è un event handler per l'evento OnCloseQuery lascia a lui l'ultima parola
+  // se c'ï¿½ un event handler per l'evento OnCloseQuery lascia a lui l'ultima parola
   if Assigned(FOnCloseQuery) then
     FOnCloseQuery(Self, Result);
 end;
@@ -1783,16 +1824,16 @@ var
 begin
   FExecuting := True;
   try
-    // NB: DoOnConfirmationRequest richiede eventuale conferma all'utente ma solo se è in modalità attiva
-    //      cioè è la prima BSCloseQueryAction della catena di esecuzione delle CloseQueryActions. HO
-    //      fatto in questo modo sia perchè altrimenti ci sarebbero potute essere varie richieste di conferma
-    //      sia perchè altrimenti avevo un AV error.
-    // NB: Mauri 23/09/2023: Non c'è più dil DoOnConfirmationRequest perchè rimosso perchè ho aggiunto l'evento
+    // NB: DoOnConfirmationRequest richiede eventuale conferma all'utente ma solo se ï¿½ in modalitï¿½ attiva
+    //      cioï¿½ ï¿½ la prima BSCloseQueryAction della catena di esecuzione delle CloseQueryActions. HO
+    //      fatto in questo modo sia perchï¿½ altrimenti ci sarebbero potute essere varie richieste di conferma
+    //      sia perchï¿½ altrimenti avevo un AV error.
+    // NB: Mauri 23/09/2023: Non c'ï¿½ piï¿½ dil DoOnConfirmationRequest perchï¿½ rimosso perchï¿½ ho aggiunto l'evento
     //      "CanExecute" a tutte le StdActions.
     if _CanClose then
     begin
-      // Se è il caso fa l'Execute anche sulle ChildCQA
-      // NB: Le esegue sempre a partire da quella creata più recentemente (child) e andando all'indietro
+      // Se ï¿½ il caso fa l'Execute anche sulle ChildCQA
+      // NB: Le esegue sempre a partire da quella creata piï¿½ recentemente (child) e andando all'indietro
       //      quindi esegue prima le ChildCQA e poi se stessa
       if FOnUpdateScope in [usGlobal] then
         TioBSCloseQueryActionRegister.Execute(Self);
@@ -2260,14 +2301,14 @@ var
 begin
   if Assigned(Action_ShowOrSelectAction) and Action_ShowOrSelectAction._IsEnabled then
   begin
-    // Controlla se la ShowOrSelect action è realmente una action di questo tipo
+    // Controlla se la ShowOrSelect action ï¿½ realmente una action di questo tipo
     if not (Action_ShowOrSelectAction is TioVMActionBSShowOrSelect) then
       raise EioGenericException.Create(ClassName, '_ShowRevertedObj',
         Format('"Action_ShowOrSelectAction" property is of the wrong type "%s" insitead of "TioBSShowOrSelect".',
         [(Action_ShowOrSelectAction as TObject).ClassName]));
     // Estrae il tipo reale della ShowOrSelect action per poter poi accedere a informazioni che riguardano
     //  soprattutto come ottenere un ViewCOntext.
-    //  NB: Questa azione in realtà non eseguirà la ShowOrSelect action impostata bensì farà una chiamata
+    //  NB: Questa azione in realtï¿½ non eseguirï¿½ la ShowOrSelect action impostata bensï¿½ farï¿½ una chiamata
     //       io.Show... usando le informazioni recuperate.
     LShowOrSelectAction := Action_ShowOrSelectAction as TioVMActionBSShowOrSelect;
     case LShowOrSelectAction.ViewContextBy of
@@ -2354,14 +2395,14 @@ var
 begin
   if Assigned(Action_ShowOrSelectAction) and Action_ShowOrSelectAction._IsEnabled then
   begin
-    // Controlla se la ShowOrSelect action è realmente una action di questo tipo
+    // Controlla se la ShowOrSelect action ï¿½ realmente una action di questo tipo
     if not (Action_ShowOrSelectAction is TioVMActionBSShowOrSelect) then
       raise EioGenericException.Create(ClassName, '_ShowRevertedObj',
         Format('"Action_ShowOrSelectAction" property is of the wrong type "%s" insitead of "TioBSShowOrSelect".',
         [(Action_ShowOrSelectAction as TObject).ClassName]));
     // Estrae il tipo reale della ShowOrSelect action per poter poi accedere a informazioni che riguardano
     //  soprattutto come ottenere un ViewCOntext.
-    //  NB: Questa azione in realtà non eseguirà la ShowOrSelect action impostata bensì farà una chiamata
+    //  NB: Questa azione in realtï¿½ non eseguirï¿½ la ShowOrSelect action impostata bensï¿½ farï¿½ una chiamata
     //       io.Show... usando le informazioni recuperate.
     LShowOrSelectAction := Action_ShowOrSelectAction as TioVMActionBSShowOrSelect;
     case LShowOrSelectAction.ViewContextBy of
@@ -2544,7 +2585,7 @@ begin
   inherited;
 
   if not Owner.InheritsFrom(TioViewModel) then
-    raise EioException.Create(ClassName, 'Create',
+    raise EioGenericException.Create(ClassName, 'Create',
       Format('Component "%s" can only be used on class "TioViewModel" or its descendants, not "%s".', [ClassName, AOwner.ClassName]));
 
   FActions := TList<TioVMActionCustom>.Create;
@@ -2555,7 +2596,7 @@ begin
   if (FActions <> nil) and (FActions.Remove(AAction) >= 0) then
   begin
     AAction.RemoveFreeNotification(Self);
-//    AAction.FActionList := nil;
+    AAction.FActionList := nil;
   end;
 end;
 
@@ -2598,6 +2639,58 @@ begin
 end;
 
 initialization
-  RegisterClasses([TioVMActionCustom, TioVMAction, TioVMActionList]);
+  RegisterClasses([
+    TioVMActionCustom,
+    TioVMAction,
+    TioVMActionList,
+    TioVMActionBSSelectCurrent,
+    TioVMActionBSNextPage,
+    TioVMActionBSPrevPage,
+    TioVMActionBSBuildWhere,
+    TioVMActionBSClearWhere,
+    TioVMActionBSShowOrSelect,
+    TioVMActionBSCloseQuery,
+    TioVMActionBSPersistenceSaveRevertPoint,
+    TioVMActionBSPersistenceClear,
+    TioVMActionBSPersistencePersist,
+    TioVMActionBSPersistenceRevert,
+    TioVMActionBSPersistenceRevertOrDelete,
+    TioVMActionBSPersistenceDelete,
+    TioVMActionBSPersistenceReload,
+    TioVMActionBSPersistenceAppend,
+    TioVMActionBSPersistenceInsert,
+    TioVMActionBS_ETM_RevertToObject,
+    TioVMActionBS_ETM_RevertToBindSource,
+    TioVMDoSynchronization
+  ]);
+
+  GVMActionRegistry := TStringList.Create;
+  GVMActionRegistry.Sorted := True;
+  GVMActionRegistry.Duplicates := dupIgnore;
+
+  RegisterVMActions('BindSource',
+    [TioVMActionBSSelectCurrent, TioVMActionBSShowOrSelect, TioVMActionBSCloseQuery]);
+  RegisterVMActions('BindSource - ETM',
+    [TioVMActionBS_ETM_RevertToObject, TioVMActionBS_ETM_RevertToBindSource]);
+  RegisterVMActions('BindSource - Paging',
+    [TioVMActionBSNextPage, TioVMActionBSPrevPage]);
+  RegisterVMActions('BindSource - Persistence',
+    [TioVMActionBSPersistenceAppend, TioVMActionBSPersistenceInsert,
+     TioVMActionBSPersistencePersist, TioVMActionBSPersistenceRevert,
+     TioVMActionBSPersistenceRevertOrDelete, TioVMActionBSPersistenceDelete,
+     TioVMActionBSPersistenceReload, TioVMActionBSPersistenceSaveRevertPoint,
+     TioVMActionBSPersistenceClear]);
+  RegisterVMActions('BindSource - Where Builder',
+    [TioVMActionBSBuildWhere, TioVMActionBSClearWhere]);
+  RegisterVMActions('Synchronization',
+    [TioVMDoSynchronization]);
+
+finalization
+  while GVMActionRegistry.Count > 0 do
+  begin
+    GVMActionRegistry.Objects[0].Free;
+    GVMActionRegistry.Delete(0);
+  end;
+  FreeAndNil(GVMActionRegistry);
 
 end.

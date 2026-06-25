@@ -17,6 +17,7 @@ type
 
   [diViewModelImplements(IVMStart)]
   TVMStart = class(TioViewModel, IVMStart)
+    VMActionList1: TioVMActionList;
     acQuit: TioVMActionBSCloseQuery;
     acShowOrders: TioVMActionBSShowOrSelect;
     acShowCustomers: TioVMActionBSShowOrSelect;
