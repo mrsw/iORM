@@ -70,7 +70,7 @@ type
     FDataSetLinkContainer: IioBSAToDataSetLinkContainer;
     FBSPersistenceDeleting: Boolean;
     // Reference to the same instance contained by FList field, this reference is only to keep live the list instance
-    // TODO: Dopo aver eliminato le IioList<T> interne è da eliminare? Opppure la teniamo e ripristiniamo anche i costruttori per le liste di Spring4D
+    // TODO: Dopo aver eliminato le IioList<T> interne ï¿½ da eliminare? Opppure la teniamo e ripristiniamo anche i costruttori per le liste di Spring4D
     FInterfacedList: IInterface;
     // AsyncLoad property
     function GetAsyncLoad: Boolean;
@@ -345,14 +345,14 @@ end;
 procedure TioActiveInterfaceListBindSourceAdapter.DoAfterDelete;
 begin
   inherited;
-  DoAfterScroll; // Mauri 11/01/2022: Aggiunto perchè altrimenti iin alcuni casi particolari dava errori
+  DoAfterScroll; // Mauri 11/01/2022: Aggiunto perchï¿½ altrimenti iin alcuni casi particolari dava errori
   TioCommonBSAPersistence.AfterDelete(Self);
 end;
 
 procedure TioActiveInterfaceListBindSourceAdapter.DoAfterInsert;
 begin
   inherited;
-  DoAfterScroll; // Mauri 11/01/2022: Aggiunto perchè altrimenti iin alcuni casi particolari dava errori
+  DoAfterScroll; // Mauri 11/01/2022: Aggiunto perchï¿½ altrimenti iin alcuni casi particolari dava errori
   TioCommonBSAPersistence.AfterInsert(Self);
 end;
 
@@ -435,7 +435,7 @@ begin
   if not Assigned(AMasterObj) then
   begin
     Self.InternalSetDataObject(nil, False);
-    // 2° parameter false ABSOLUTELY!!!!!!!
+    // 2ï¿½ parameter false ABSOLUTELY!!!!!!!
     Exit;
   end;
   // Extract master property value
@@ -456,7 +456,7 @@ begin
   begin
     LDetailObj := LLazyLoadableObj.GetInternalObject;
     Self.InternalSetDataObject(LDetailObj, False);
-    // 2° parameter false ABSOLUTELY!!!!!!!
+    // 2ï¿½ parameter false ABSOLUTELY!!!!!!!
   end
   else
     // else if it isn't a LazyLoadable list but the MasterProperty is an interface...
@@ -464,12 +464,12 @@ begin
     begin
       LDetailIntf := LValue.AsInterface;
       Self.InternalSetDataObject(LDetailIntf, False);
-      // 2° parameter false ABSOLUTELY!!!!!!!
+      // 2ï¿½ parameter false ABSOLUTELY!!!!!!!
     end
     // else it's a normal List object (not an interface)
     else
       Self.InternalSetDataObject(LDetailObj, False);
-  // 2° parameter false ABSOLUTELY!!!!!!!
+  // 2ï¿½ parameter false ABSOLUTELY!!!!!!!
 end;
 
 function TioActiveInterfaceListBindSourceAdapter.GetLazy: Boolean;
@@ -542,7 +542,8 @@ function TioActiveInterfaceListBindSourceAdapter.NewDetailBindSourceAdapter(cons
 begin
   // Return the requested DetailBindSourceAdapter and set the current master object
   Result := FDetailAdaptersContainer.NewDetailBindSourceAdapter(AOwner, GetBaseObjectRttiType.Name, AMasterPropertyName, AWhere);
-  FDetailAdaptersContainer.SetMasterObject(Self.Current);
+  if Assigned(Self.Current) then
+    FDetailAdaptersContainer.SetMasterObject(Self.Current);
 end;
 
 function TioActiveInterfaceListBindSourceAdapter.GetioAutoPost: Boolean;
@@ -704,8 +705,8 @@ var
   LSelectedAsIntf: IInterface;
 begin
   // Questo ActiveBindSourceAdapter funziona solo con gli oggetti (no interfacce)
-  // quindi chiama l'altra versione di metodo più adatta. IN questo modo
-  // è possibile gestire la selezione anche se il selettore non è concorde
+  // quindi chiama l'altra versione di metodo piï¿½ adatta. IN questo modo
+  // ï¿½ possibile gestire la selezione anche se il selettore non ï¿½ concorde
   if Supports(ASelected, IInterface, LSelectedAsIntf) then
     ReceiveSelection(LSelectedAsIntf, ASelectionType)
   else
@@ -820,10 +821,10 @@ begin
   begin
     SetList(nil, AOwnsObject);
     // Fix the "Couldn't find Value" or "Couldn't find Owner" or similar using "CustomFormat" links property
-    // NB: Questo "AddFields" che sembrerebbe non aver senso in questo punto in realtà risolve un errore che mi ha segnalato
+    // NB: Questo "AddFields" che sembrerebbe non aver senso in questo punto in realtï¿½ risolve un errore che mi ha segnalato
     // Carlo Marona; questo errore (vedi sopra) si verificava se si impostava nil come DataObject (SetDataObject(nil))
-    // ed era dovuto perchè nell'inherited viene richiamato "ClearFields" che evidentemente eliminava dal sistema di LookUp
-    // di LiveBindings non solo i links relativi al DataObject precedente ma anche appunto "Value" e "Owner" e chissà quali
+    // ed era dovuto perchï¿½ nell'inherited viene richiamato "ClearFields" che evidentemente eliminava dal sistema di LookUp
+    // di LiveBindings non solo i links relativi al DataObject precedente ma anche appunto "Value" e "Owner" e chissï¿½ quali
     // altri. Con questa riga evidentemente si registrano di nuovo questi IScope nel sistema di LookUp stesso.
     AddFields;
     FDetailAdaptersContainer.SetMasterObject(nil);
@@ -837,7 +838,7 @@ begin
   // normali dava dei problemi (non dava errori ma non usciva nulla)
   // if Supports(AObj, IioLazyLoadable, ALazyLoadableObj)
   // then AObj := TList<TObject>(ALazyLoadableObj.GetInternalObject);
-  // Self.SetList(AObj as TList<IInterface>, False);  // NB: AOwns (2° parameters) = False ABSOLUTELY!!!!!!
+  // Self.SetList(AObj as TList<IInterface>, False);  // NB: AOwns (2ï¿½ parameters) = False ABSOLUTELY!!!!!!
   /// / -------------------------------------------------------------------------------------------------------
 end;
 

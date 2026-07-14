@@ -116,6 +116,14 @@ var
   LMasterProperty: IioProperty;
   LNewAdapter: IioContainedBindSourceAdapter;
 begin
+  // If an adapter for this property was already created (e.g. by ForceDetailAdaptersCreation
+  // while a detail presenter's own _CreateAdapter is still on the call stack), return the
+  // existing instance to avoid a duplicate-key error in FDetailAdapters.
+  if FDetailAdapters.ContainsKey(AMasterPropertyName) then
+  begin
+    Result := FDetailAdapters.Items[AMasterPropertyName].AsActiveBindSourceAdapter;
+    Exit;
+  end;
   // Retrieve MasterContext and MasterProperty
   LMap := TioMapContainer.GetMap(AMasterClassName);
   LMasterProperty := LMap.GetProperties.GetPropertyByName(AMasterPropertyName);

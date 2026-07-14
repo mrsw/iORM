@@ -55,10 +55,10 @@ type
     FLazyProps: String;
     FAsyncLoad: Boolean;
     FAsyncPersist: Boolean;
-    FTypeOfCollection: TioTypeOfCollection; // Renderlo automatico??? (rilevamento se è una lista con DuckTyping)
+    FTypeOfCollection: TioTypeOfCollection; // Renderlo automatico??? (rilevamento se ï¿½ una lista con DuckTyping)
     FMasterBindSource: IioBindSource;
     FMasterPropertyName: String;
-    FWhere: IioWhere; // Istanza temporanea solo fintanto che non c'è il BSA
+    FWhere: IioWhere; // Istanza temporanea solo fintanto che non c'ï¿½ il BSA
     FWhereStr: TStrings;
     FWhereDetailsFromDetailAdapters: Boolean;
     FOrderBy: String;
@@ -71,8 +71,8 @@ type
     FSelectorFor: IioBindSource;
     FOnReceiveSelectionCloneObject: Boolean;
     FOnReceiveSelectionFreeObject: Boolean;
-    // Questà è una collezione dove eventuali DataSet di dettaglio
-    // si registrano per rendere nota la loro esistenza al Master. Sarà poi
+    // Questï¿½ ï¿½ una collezione dove eventuali DataSet di dettaglio
+    // si registrano per rendere nota la loro esistenza al Master. Sarï¿½ poi
     // usata dal Master per fare in modo che, quando viene richiesta la creazione
     // del suo BindSourceAdapter (del master), venga scatenata anche la creazione
     // anche di tutti gli adapters relativi ai presenters di dettaglio (che si sono
@@ -250,6 +250,7 @@ type
     function CheckAdapter: Boolean; overload;
     function CheckAdapter(const ACreateIfNotAssigned: Boolean): Boolean; overload;
     function CheckActiveAdapter: Boolean;
+    function HasActiveAdapter: Boolean;
     procedure RegisterDetailBindSource(const ADetailBindSource: IioBindSource);
     procedure UnregisterDetailBindSource(const ADetailBindSource: IioBindSource);
     procedure ForceDetailAdaptersCreation;
@@ -314,6 +315,11 @@ begin
   Result := GetActiveBindSourceAdapter <> nil;
 end;
 
+function TioDataSetCustom.HasActiveAdapter: Boolean;
+begin
+  Result := CheckAdapter;
+end;
+
 function TioDataSetCustom.CheckAdapter(const ACreateIfNotAssigned: Boolean): Boolean;
 begin
   // if the adapter is not already assigned then create it
@@ -348,8 +354,8 @@ begin
   FSelectorFor := nil;
   FOnReceiveSelectionCloneObject := True;
   FOnReceiveSelectionFreeObject := True;
-  // Questà è una collezione dove eventuali DataSet di dettaglio
-  // si registrano per rendere nota la loro esistenza al Master. Sarà poi
+  // Questï¿½ ï¿½ una collezione dove eventuali DataSet di dettaglio
+  // si registrano per rendere nota la loro esistenza al Master. Sarï¿½ poi
   // usata dal Master per fare in modo che, quando viene richiesta la creazione
   // del suo BindSourceAdapter (del master), venga scatenata anche la creazione
   // anche di tutti gli adapters relativi ai presenters di dettaglio (che si sono
@@ -639,7 +645,7 @@ begin
     Result := GetActiveBindSourceAdapter.ioWhere;
     Exit;
   end;
-  // if not already assigned then create it (così lo crea solo se serve
+  // if not already assigned then create it (cosï¿½ lo crea solo se serve
   // davvero altrimenti no)
   if not Assigned(FWhere) then
     FWhere := TioWhereFactory.NewWhereWithPagingAndETMfor(FPaging, FETMfor);
@@ -760,10 +766,10 @@ end;
 
 procedure TioDataSetCustom.SelectCurrent(ASelectionType: TioSelectionType);
 begin
-  // C'era un problema se il target è un BS che espone un singolo oggetto e in
-  // precedenza era stato impostato il suo dataObject a nil perchè in questo caso negli
+  // C'era un problema se il target ï¿½ un BS che espone un singolo oggetto e in
+  // precedenza era stato impostato il suo dataObject a nil perchï¿½ in questo caso negli
   // ObjectBSA il ABSA si disattiva (Active = False) e quindi poi quando faceva
-  // il SetDataObject sul TargetBSA dava un errore perchè non era attivo.
+  // il SetDataObject sul TargetBSA dava un errore perchï¿½ non era attivo.
   if not FSelectorFor.IsActive then
     FSelectorFor.Open;
   if IsInterfacePresenting then
@@ -842,7 +848,7 @@ begin
       GetActiveBindSourceAdapter.SetDataObject(ADataObject, AOwnsObject)
     else
       _CreateAdapter(ADataObject, AOwnsObject);
-    // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+    // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
     //  altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
     if not IsActive then
       Open;
@@ -871,9 +877,9 @@ begin
 //  //  if it is assigned then automatically activated the BindSource otherwise exits immediately
 //  //  because it does not need to do anything (the BindSource is already closed and if the new
 //  //  DataObject is being set to nil...)
-//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
 //  //  altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
-//  // NB: Se il BS non è mai stato attivo prima allora crea anche il relativo ActiveBindSourceAdapter
+//  // NB: Se il BS non ï¿½ mai stato attivo prima allora crea anche il relativo ActiveBindSourceAdapter
 //  else
 //  begin
 //    if Assigned(ADataObject) then
@@ -890,7 +896,7 @@ begin
 //  // if it is assigned then automatically activated the BindSource otherwise exits immediately
 //  // because it does not need to do anything (the BindSource is already closed and if the new
 //  // DataObject is being set to nil...)
-//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
 //  // altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
 //  if not IsActive then
 //    if Assigned(ADataObject) then
@@ -923,7 +929,7 @@ begin
       GetActiveBindSourceAdapter.SetDataObject(ADataObject, AOwnsObject)
     else
       _CreateAdapter(ADataObject as TObject, AOwnsObject);
-    // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+    // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
     //  altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
     if not IsActive then
       Open;
@@ -949,9 +955,9 @@ begin
 //  //  if it is assigned then automatically activated the BindSource otherwise exits immediately
 //  //  because it does not need to do anything (the BindSource is already closed and if the new
 //  //  DataObject is being set to nil...)
-//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
 //  //  altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
-//  // NB: Se il BS non è mai stato attivo prima allora crea anche il relativo ActiveBindSourceAdapter
+//  // NB: Se il BS non ï¿½ mai stato attivo prima allora crea anche il relativo ActiveBindSourceAdapter
 //  else
 //  begin
 //    if Assigned(ADataObject) then
@@ -966,7 +972,7 @@ begin
 //  // if it is assigned then automatically activated the BindSource otherwise exits immediately
 //  // because it does not need to do anything (the BindSource is already closed and if the new
 //  // DataObject is being set to nil...)
-//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
 //  // altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
 //  if not IsActive then
 //    if Assigned(ADataObject) then
@@ -982,8 +988,8 @@ begin
 //  if not CheckAdapter then
 //    // Create the BSA
 //    // NB: Nel caso in cui si sita impostando il DataObject ma il BSA non era ancora creato lo crea (il BSA)
-//    // usando il ClassName dell'oggetto; in questo modo siamo sicuri che abbiamo il BSA più
-//    // adatto e non uno che magari è più generico e a cui mancano alcune proprietà (è successo).
+//    // usando il ClassName dell'oggetto; in questo modo siamo sicuri che abbiamo il BSA piï¿½
+//    // adatto e non uno che magari ï¿½ piï¿½ generico e a cui mancano alcune proprietï¿½ (ï¿½ successo).
 //    _CreateAdapter(ADataObject as TObject, AOwnsObject)
 //  else
 //    // Set the data object into the BSA
@@ -1135,7 +1141,7 @@ begin
   // NB: Mettendo questa linea di codice ho risolto il problema che i ioPBS
   // anche se erano con "AutoActivate=False" quando veniva aperta (caricata)
   // la form che li conteneva a design time apparivano cmq con i dati finti di
-  // prova anzichè rimanere vuoti.
+  // prova anzichï¿½ rimanere vuoti.
   if (csDesigning in ComponentState) then
     Exit;
   // Set the onChange event handler
@@ -1193,7 +1199,7 @@ begin
       ._OrderBy(FOrderBy), TypeOfCollection, ADataObject, AOwnsObject));
     // Force the creation of all the detail adapters (if exists)
     // NB: Per risolvere alcuni problemi di sequenza (tipo le condizioni in WhereStr di dettaglio che non
-    // funzionavano perchè al momento di apertura del MasterAdapter i DetailAdapters non erano ancora nemmeno
+    // funzionavano perchï¿½ al momento di apertura del MasterAdapter i DetailAdapters non erano ancora nemmeno
     // stati creati) forzo la creazione anche di tutti gli adapters di dettaglio al momento della creazione
     // del Master.
     ForceDetailAdaptersCreation;
