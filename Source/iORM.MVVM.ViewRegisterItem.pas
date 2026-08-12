@@ -77,7 +77,15 @@ procedure TioViewContextRegisterItem.CheckForLife;
 begin
   if (not Assigned(FView)) and (not FReleasingViewContext) then
     ReleaseViewContext;
-  if (not Assigned(FView)) and (not Assigned(FViewContext)) and not (csDestroying in Self.ComponentState) then
+  // NB: "not FReleasingViewContext" added below for the same reason it is
+  // already used in the check above: if the View/ViewContext notification
+  // that leads here fires synchronously from inside our own ReleaseViewContext
+  // (e.g. via FViewContextProvider.ReleaseViewContext -> DoOnRelease -> the
+  // application's OnRelease handler destroying FViewContext), DisposeOf would
+  // destroy Self while ReleaseViewContext is still executing on it, so the
+  // remaining statements there (FViewContextFreeMethodIsPresent/
+  // FViewContextFreeMethod) would run against already-freed memory.
+  if (not Assigned(FView)) and (not Assigned(FViewContext)) and (not FReleasingViewContext) and not (csDestroying in Self.ComponentState) then
     DisposeOf;
 end;
 
@@ -128,20 +136,33 @@ procedure TioViewContextRegisterItem.ReleaseViewContext;
 begin
   // If already destroyed then exit
   FReleasingViewContext := True;
-  // View
-  if Assigned(FView) then
-    FreeAndNil(FView);
-  // ViewContext
-  if Assigned(FViewContext) then
-  begin
-    if Assigned(FViewContextProvider) then
-      FViewContextProvider.ReleaseViewContext(FView, FViewContext);
-    // NB: Ho sostituito il test Assigned con una apposita variabile "FViewContextFreeMethodIsPresent" settata nel costruttore
-    //      perchè altrimenti capitava che su android 10 "FViewContextFreeMethod" cambiasse senza apparente mitovo e da nil
-    //      assumesse un altro valore non nil che poi causava un AV (perchè l'anonimous method in realtà non c'era.
-//    if Assigned(FViewContextFreeMethod) then
-    if FViewContextFreeMethodIsPresent then
-      FViewContextFreeMethod;
+  try
+    // View
+    if Assigned(FView) then
+      FreeAndNil(FView);
+    // ViewContext
+    if Assigned(FViewContext) then
+    begin
+      if Assigned(FViewContextProvider) then
+        FViewContextProvider.ReleaseViewContext(FView, FViewContext);
+      // NB: Ho sostituito il test Assigned con una apposita variabile "FViewContextFreeMethodIsPresent" settata nel costruttore
+      //      perchï¿½ altrimenti capitava che su android 10 "FViewContextFreeMethod" cambiasse senza apparente mitovo e da nil
+      //      assumesse un altro valore non nil che poi causava un AV (perchï¿½ l'anonimous method in realtï¿½ non c'era.
+  //    if Assigned(FViewContextFreeMethod) then
+      if FViewContextFreeMethodIsPresent then
+        FViewContextFreeMethod;
+    end;
+  finally
+    // NB: reset before the CheckForLife-equivalent check below (not via
+    // CheckForLife itself, to avoid re-entering ReleaseViewContext through
+    // its first condition) so Self can still be disposed once it is
+    // actually safe to do so - see the matching guard in CheckForLife: while
+    // FReleasingViewContext stayed True forever, DisposeOf never fired again
+    // for this item, leaking every TioViewContextRegisterItem that ever went
+    // through this method.
+    FReleasingViewContext := False;
+    if (not Assigned(FView)) and (not Assigned(FViewContext)) and not (csDestroying in Self.ComponentState) then
+      DisposeOf;
   end;
 end;
 
