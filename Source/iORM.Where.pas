@@ -276,6 +276,7 @@ type
     function _Where(AWhere: IioWhere): IioWhere; overload;
     function _Where(ATextCondition: String): IioWhere; overload;
     function _Where(const APropertyName: String; const ACompareOp: TioCompareOp): IioWhere; overload;
+    function _Where(const APropertyName: String; const ACompareOp: TioCompareOp; const AValue: TValue): IioWhere; overload;
     function _Where(const APropertyName: String; const ACompareOp: TioCompareOp; const AValue: Variant): IioWhere; overload;
     function _Where(const APropertyName: String; const ACompareOp: TioCompareOp; const AValue: TObject): IioWhere; overload;
     function _Where(const APropertyName: String; const ACompareOp: TioCompareOp; const AValue: IInterface): IioWhere; overload;
@@ -2400,6 +2401,12 @@ function TioWhere._Where(const APropertyName: String; const ACompareOp: TioCompa
 begin
   Result := Self;
   _AddCriteria(APropertyName, ACompareOp, TValue.From<IInterface>(AValue));
+end;
+
+function TioWhere._Where(const APropertyName: String; const ACompareOp: TioCompareOp; const AValue: TValue): IioWhere;
+begin
+  Result := Self;
+  _AddCriteria(APropertyName, ACompareOp, AValue);
 end;
 
 function TioWhere._Where(const APropertyName: String; const ACompareOp: TioCompareOp): IioWhere;

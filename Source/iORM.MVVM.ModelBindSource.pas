@@ -199,8 +199,8 @@ end;
 
 procedure TioModelBindSource.Loaded;
 begin
-  // Qui forzo l'AutoPost a True perchè ridichiarare la proprietà con default = True
-  //  non è stato sufficiente anche perchè il getter e setter sono privati e statici nell'antenato.
+  // Qui forzo l'AutoPost a True perchï¿½ ridichiarare la proprietï¿½ con default = True
+  //  non ï¿½ stato sufficiente anche perchï¿½ il getter e setter sono privati e statici nell'antenato.
   AutoPost := True;
   // CONNECTIONDEF REGISTRATION (IF NEEDED) MUST BE BEFORE THE DOCREATEADAPTER
   // ===========================================================================
@@ -220,9 +220,9 @@ begin
   end;
   // ===========================================================================
 
-  // Qui siamo subito dopo il caricamento dei valori delle proprietà dal file DFM
-  //  e se la proprietà Preview = True scatena il relativo metodo set per far si
-  //  che venga posta a true anche la proprietà AutoActivate e rendere visibile
+  // Qui siamo subito dopo il caricamento dei valori delle proprietï¿½ dal file DFM
+  //  e se la proprietï¿½ Preview = True scatena il relativo metodo set per far si
+  //  che venga posta a true anche la proprietï¿½ AutoActivate e rendere visibile
   //  i dati a desig-time
   SetPreview(Preview);
 
@@ -234,7 +234,7 @@ begin
   inherited;
 
 
-  // Se è stata impostata la proprietà "CrossView_MasterBindSource" allora significa che siamo
+  // Se ï¿½ stata impostata la proprietï¿½ "CrossView_MasterBindSource" allora significa che siamo
   //  in una MicroEmbededView e l'accoppiamento con il MasterBS deve avvenire sulla vista e non
   //  tra VM. La riga qui sotto registra il BS attuale come slave del MasterBS presente sulla
   //  MasterView+MasterVM in modo che anchesso venga aperto.
@@ -283,6 +283,13 @@ begin
   if Value and (not Assigned(FBindSourceAdapter)) and (not(csDesigning in ComponentState)) then
     _CreateAdapter;
 
+  // If the adapter still could not be obtained (e.g. the presenter's detail adapter
+  // hasn't been created yet because ioViewModelViewPairing hasn't fired yet), bail
+  // out silently. The presenter will open this bind source later via
+  // OpenCloseViewBindSources once everything is ready.
+  if Value and (not Assigned(FBindSourceAdapter)) and (not(csDesigning in ComponentState)) then
+    Exit;
+
   inherited;
 
   // If the ModelPresenter is a master model presenter then clear the
@@ -319,7 +326,7 @@ end;
 procedure TioModelBindSource.SetPreview(const Value: Boolean);
 begin
   // Se stiamo abilitando la preview e siamo a design time attiva
-  //  la proprietà "AutoActivate" per mostrare i dati anche a design-time
+  //  la proprietï¿½ "AutoActivate" per mostrare i dati anche a design-time
   FPreview := Value;
   AutoActivate := FPreview and (csDesigning in ComponentState);
 end;

@@ -41,6 +41,7 @@ requires
   iORM_FMX_RT;
 
 contains
-  iORM.MVVM.FMX.FastReportModelPresenter in '..\..\Source\iORM.MVVM.FMX.FastReportModelPresenter.pas';
+  iORM.MVVM.FMX.FastReportModelPresenter in '..\..\Source\iORM.MVVM.FMX.FastReportModelPresenter.pas',
+  iORM.MVVM.FMX.FastReportDataset in '..\..\Source\iORM.MVVM.FMX.FastReportDataset.pas';
 
 end.

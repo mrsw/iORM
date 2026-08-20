@@ -176,6 +176,9 @@ end;
 
 procedure TioFastReportModelPresenterDataSet.SetModelPresenter(const Value: TioModelPresenterCustom);
 begin
+  if not Assigned(Value) and Assigned(FModelPresenter) then
+    FModelPresenter.RemoveFreeNotification(Self);
+
   FModelPresenter := Value;
 
   if Assigned(FModelPresenter) then

@@ -53,7 +53,7 @@ type
     FLazy: Boolean;
     FLazyProps: String;
     FTypeOfCollection: TioTypeOfCollection;
-    FWhere: IioWhere; // Istanza temporanea solo fintanto che non c'è il BSA
+    FWhere: IioWhere; // Istanza temporanea solo fintanto che non c'ï¿½ il BSA
     FWhereStr: TStrings;
     FWhereDetailsFromDetailAdapters: Boolean;
     FOrderBy: String;
@@ -68,8 +68,8 @@ type
     FSelectorFor: IioBindSource;
     FOnReceiveSelectionCloneObject: Boolean;
     FOnReceiveSelectionFreeObject: Boolean;
-    // Questà è una collezione dove eventuali ModelPresenter di dettaglio
-    // si registrano per rendere nota la loro esistenza al Master. Sarà poi
+    // Questï¿½ ï¿½ una collezione dove eventuali ModelPresenter di dettaglio
+    // si registrano per rendere nota la loro esistenza al Master. Sarï¿½ poi
     // usata dal Master per fare in modo che, quando viene richiesta la creazione
     // del suo BindSourceAdapter (del master), venga scatenata anche la creazione
     // anche di tutti gli adapters relativi ai presenters di dettaglio (che si sono
@@ -83,7 +83,7 @@ type
     // parte del ModelPresenter al quale sono collegati
     // NB: IInterface per evitare un circular reference error
     FViewBindSourceContainer: TList<IInterface>;
-    // Questo è un riferimento di tipo interfaccia e serve solo per
+    // Questo ï¿½ un riferimento di tipo interfaccia e serve solo per
     // mantenere in vita l'oggetto
     // FDummyInterfaceRef: IInterface; NB: Hint prevention "symbol declared but never used"
     // Selection related events
@@ -107,6 +107,13 @@ type
     procedure WhereOnChangeEventHandler(Sender: TObject);
     procedure OpenCloseViewBindSources(const AActive: Boolean);
     procedure OpenCloseDetails(const AActive: Boolean);
+    // Carlo Marona (2026-02-06)
+    // This method seems to be equal to OpenCloseDetails but it isn't.
+    // The OpenCloseDetails method open or close details BindSources accordingly to AActive parameter. If AActive is true
+    // and the BindSource is already active, its open method skips.
+    // The RefreshDetails method, saves actual active status and then forces close of the BindSource the reopen it based
+    // on previous active state
+    procedure RefreshDetails;   // Carlo Marona (2026-02-06)
     // AsDefault
     function GetAsDefault: Boolean;
     procedure SetAsDefault(const Value: Boolean);
@@ -271,6 +278,7 @@ type
     function CheckAdapter: Boolean; overload;
     function CheckAdapter(const ACreateIfNotAssigned: Boolean): Boolean; overload;
     function CheckActiveAdapter: Boolean;
+    function HasActiveAdapter: Boolean;
     procedure Notify(const Sender: TObject; const [Ref] ANotification: TioBSNotification);
     // procedure SetMasterBindSourceAdapter(const AMasterBindSourceAdapter:IioActiveBindSourceAdapter; const AMasterPropertyName:String='');
     procedure RegisterDetailBindSource(const ADetailBindSource: IioBindSource);
@@ -329,7 +337,7 @@ type
     function DataObjectAs<T>: T;
     function DataObjectAssigned: Boolean;
     // ----------------------------------------------------------------------------------------------------------------------------
-    // NB: Queste sotto sono proprietà lasciate in public perchè usate in qualche parte del codice
+    // NB: Queste sotto sono proprietï¿½ lasciate in public perchï¿½ usate in qualche parte del codice
     property AsDefault: Boolean read GetAsDefault write SetAsDefault; // Published: Master // non mettere default
     property ItemCount: Integer read GetCount; // Public: Master+Detail
     property MasterBindSource: IioBindSource read FMasterBindSource write SetMasterBindSource; // Published: Detail
@@ -337,7 +345,7 @@ type
     property OrderBy: String read FOrderBy Write SetOrderBy; // Published: Master
     property TypeName: String read GetTypeName write SetTypeName; // Published: Master
     property Where: IioWhere read GetWhere write SetWhere; // public: Master
-    // Published properties: selectors (NB: lasciata public perchè usata da qualche parte nel codice)
+    // Published properties: selectors (NB: lasciata public perchï¿½ usata da qualche parte nel codice)
     property SelectorFor: IioBindSource read GetSelectorFor write SetSelectorFor; // published: Master
   published
     property _Version: String read Get_Version;
@@ -356,8 +364,8 @@ begin
   if CheckAdapter then
   begin
     GetActiveBindSourceAdapter.Append(AObject);
-    // NB: HO commentato la riga sotto perchè Marco Mottadelli mi ha segnalato che causava
-    // il fatto che lo stato del componente passava subito a "Browse" perchè veniva
+    // NB: HO commentato la riga sotto perchï¿½ Marco Mottadelli mi ha segnalato che causava
+    // il fatto che lo stato del componente passava subito a "Browse" perchï¿½ veniva
     // invocato un Post in seguito al Refresh stesso.
     // BindSourceAdapter.Refresh(False);
   end;
@@ -374,8 +382,8 @@ begin
   if CheckAdapter then
   begin
     GetActiveBindSourceAdapter.Append(AObject);
-    // NB: HO commentato la riga sotto perchè Marco Mottadelli mi ha segnalato che causava
-    // il fatto che lo stato del componente passava subito a "Browse" perchè veniva
+    // NB: HO commentato la riga sotto perchï¿½ Marco Mottadelli mi ha segnalato che causava
+    // il fatto che lo stato del componente passava subito a "Browse" perchï¿½ veniva
     // invocato un Post in seguito al Refresh stesso.
     // BindSourceAdapter.Refresh(False);
   end;
@@ -407,6 +415,11 @@ end;
 function TioModelPresenterCustom.CheckActiveAdapter: Boolean;
 begin
   Result := GetActiveBindSourceAdapter <> nil;
+end;
+
+function TioModelPresenterCustom.HasActiveAdapter: Boolean;
+begin
+  Result := Assigned(FBindSourceAdapter);
 end;
 
 function TioModelPresenterCustom.CheckAdapter(const ACreateIfNotAssigned: Boolean): Boolean;
@@ -449,8 +462,8 @@ begin
   FSelectorFor := nil;
   FOnReceiveSelectionCloneObject := True;
   FOnReceiveSelectionFreeObject := True;
-  // Questà è una collezione dove eventuali ModelPresenters di dettaglio
-  // si registrano per rendere nota la loro esistenza al Master. Sarà poi
+  // Questï¿½ ï¿½ una collezione dove eventuali ModelPresenters di dettaglio
+  // si registrano per rendere nota la loro esistenza al Master. Sarï¿½ poi
   // usata dal Master per fare in modo che, quando viene richiesta la creazione
   // del suo BindSourceAdapter (del master), venga scatenata anche la creazione
   // anche di tutti gli adapters relativi ai presenters di dettaglio (che si sono
@@ -819,7 +832,7 @@ begin
     Result := FBindSourceAdapter.ioWhere;
     Exit;
   end;
-  // if not already assigned then create it (così lo crea solo se serve
+  // if not already assigned then create it (cosï¿½ lo crea solo se serve
   // davvero altrimenti no)
   if not Assigned(FWhere) then
     FWhere := TioWhereFactory.NewWhereWithPagingAndETMfor(FPaging, FETMfor);
@@ -852,8 +865,8 @@ begin
   if CheckAdapter then
   begin
     GetActiveBindSourceAdapter.Insert(AObject);
-    // NB: HO commentato la riga sotto perchè Marco Mottadelli mi ha segnalato che causava
-    // il fatto che lo stato del componente passava subito a "Browse" perchè veniva
+    // NB: HO commentato la riga sotto perchï¿½ Marco Mottadelli mi ha segnalato che causava
+    // il fatto che lo stato del componente passava subito a "Browse" perchï¿½ veniva
     // invocato un Post in seguito al Refresh stesso.
     // BindSourceAdapter.Refresh(False);
   end;
@@ -893,10 +906,10 @@ end;
 
 procedure TioModelPresenterCustom.SelectCurrent(ASelectionType: TioSelectionType);
 begin
-  // C'era un problema se il target è un BS che espone un singolo oggetto e in
-  // precedenza era stato impostato il suo dataObject a nil perchè in questo caso negli
+  // C'era un problema se il target ï¿½ un BS che espone un singolo oggetto e in
+  // precedenza era stato impostato il suo dataObject a nil perchï¿½ in questo caso negli
   // ObjectBSA il ABSA si disattiva (Active = False) e quindi poi quando faceva
-  // il SetDataObject sul TargetBSA dava un errore perchè non era attivo.
+  // il SetDataObject sul TargetBSA dava un errore perchï¿½ non era attivo.
   if not FSelectorFor.IsActive then
     FSelectorFor.Open;
   if IsInterfacePresenting then
@@ -997,6 +1010,26 @@ begin
     FBindSourceAdapter.Refresh(ANotify);
 end;
 
+procedure TioModelPresenterCustom.RefreshDetails;
+var
+  LDetailBindSource: IioBindSource;
+  LIsActive: Boolean;
+begin
+  if Assigned(FDetailBindSourceContainer) then
+  begin
+    for LDetailBindSource in FDetailBindSourceContainer do
+    begin
+      LIsActive := LDetailBindSource.IsActive;
+
+      if LIsActive then
+      begin
+        LDetailBindSource.Close;
+        LDetailBindSource.Open;
+      end;
+    end;
+  end;
+end;
+
 procedure TioModelPresenterCustom.RegisterDetailBindSource(const ADetailBindSource: IioBindSource);
 begin
   if not Assigned(FDetailBindSourceContainer) then
@@ -1025,7 +1058,15 @@ begin
   begin
     FViewBindSourceContainer.Add(AModelBindSourceOrModelDataSet);
     if IsActive then
-      (AModelBindSourceOrModelDataSet as IioVMBridgeClientComponent).Open
+      // Carlo Marona (2026-06-22): ForceQueue defers Open until after Loaded
+      // completes so that FioLoaded = True when _CreateAdapter is reached.
+      // Without the deferral the bail-out guard in TioModelBindSource._CreateAdapter
+      // exits early and the bind source never acquires an adapter.
+      TThread.ForceQueue(nil,
+        procedure
+        begin
+          (AModelBindSourceOrModelDataSet as IioVMBridgeClientComponent).Open;
+        end)
     else
       (AModelBindSourceOrModelDataSet as IioVMBridgeClientComponent).Close;
   end;
@@ -1060,6 +1101,10 @@ begin
   begin
     // Open/Close registered details model presenters
     OpenCloseDetails(Value);
+
+    // Carlo Marona (2026-02-06)
+    RefreshDetails;
+    
     if Value then
       DoAfterOpen
     else
@@ -1172,7 +1217,7 @@ begin
       GetActiveBindSourceAdapter.SetDataObject(ADataObject, AOwnsObject)
     else
       _CreateAdapter(ADataObject, AOwnsObject);
-    // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+    // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
     //  altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
     if not IsActive then
       Open;
@@ -1198,9 +1243,9 @@ begin
 //  //  if it is assigned then automatically activated the BindSource otherwise exits immediately
 //  //  because it does not need to do anything (the BindSource is already closed and if the new
 //  //  DataObject is being set to nil...)
-//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
 //  //  altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
-//  // NB: Se il BS non è mai stato attivo prima allora crea anche il relativo ActiveBindSourceAdapter
+//  // NB: Se il BS non ï¿½ mai stato attivo prima allora crea anche il relativo ActiveBindSourceAdapter
 //  else
 //  begin
 //    if Assigned(ADataObject) then
@@ -1215,7 +1260,7 @@ begin
 //  // if it is assigned then automatically activated the BindSource otherwise exits immediately
 //  // because it does not need to do anything (the BindSource is already closed and if the new
 //  // DataObject is being set to nil...)
-//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
 //  // altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
 //  if not IsActive then
 //    if Assigned(ADataObject) then
@@ -1248,7 +1293,7 @@ begin
       GetActiveBindSourceAdapter.SetDataObject(ADataObject, AOwnsObject)
     else
       _CreateAdapter(ADataObject as TObject, AOwnsObject);
-    // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+    // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
     //  altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
     if not IsActive then
       Open;
@@ -1274,9 +1319,9 @@ begin
 //  //  if it is assigned then automatically activated the BindSource otherwise exits immediately
 //  //  because it does not need to do anything (the BindSource is already closed and if the new
 //  //  DataObject is being set to nil...)
-//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
 //  //  altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
-//  // NB: Se il BS non è mai stato attivo prima allora crea anche il relativo ActiveBindSourceAdapter
+//  // NB: Se il BS non ï¿½ mai stato attivo prima allora crea anche il relativo ActiveBindSourceAdapter
 //  else
 //  begin
 //    if Assigned(ADataObject) then
@@ -1291,7 +1336,7 @@ begin
 //  // if it is assigned then automatically activated the BindSource otherwise exits immediately
 //  // because it does not need to do anything (the BindSource is already closed and if the new
 //  // DataObject is being set to nil...)
-//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse già) perchè
+//  // NB: Ho dovuto attivare automaticamnete il BindSource (nel caso non lo fosse giï¿½) perchï¿½
 //  // altrimenti avevo degli AV dovuti al fatto che il BSA non esisteva
 //  if not IsActive then
 //    if Assigned(ADataObject) then
@@ -1307,8 +1352,8 @@ begin
 //  if not CheckAdapter then
 //    // Create the BSA
 //    // NB: Nel caso in cui si sita impostando il DataObject ma il BSA non era ancora creato lo crea (il BSA)
-//    // usando il ClassName dell'oggetto; in questo modo siamo sicuri che abbiamo il BSA più
-//    // adatto e non uno che magari è più generico e a cui mancano alcune proprietà (è successo).
+//    // usando il ClassName dell'oggetto; in questo modo siamo sicuri che abbiamo il BSA piï¿½
+//    // adatto e non uno che magari ï¿½ piï¿½ generico e a cui mancano alcune proprietï¿½ (ï¿½ successo).
 //    _CreateAdapter(ADataObject as TObject, AOwnsObject)
 //  else
 //    // Set the data object into the BSA
@@ -1367,7 +1412,7 @@ end;
 procedure TioModelPresenterCustom.SetOrderBy(const Value: String);
 begin
   // Set the OrderBy in the Where object (questo ha veramnete effetto, FOrderBY
-  // contiene il testo solo per pubblicarne il valore come proprietà editabile
+  // contiene il testo solo per pubblicarne il valore come proprietï¿½ editabile
   // a design-time sul componente.
   FOrderBy := Value;
   Where.SetOrderBySQL(Value);
@@ -1452,7 +1497,7 @@ begin
   // NB: Mettendo questa linea di codice ho risolto il problema che i ioPBS
   // anche se erano con "AutoActivate=False" quando veniva aperta (caricata)
   // la form che li conteneva a design time apparivano cmq con i dati finti di
-  // prova anzichè rimanere vuoti.
+  // prova anzichï¿½ rimanere vuoti.
   if (csDesigning in ComponentState) then
     Exit;
   // Set the onChange event handler
@@ -1523,7 +1568,15 @@ begin
   // else if it is a master bind source but load type property is set to ltFromBSAsIs, ltFromBSReload or ltFromBSReloadNewInstance
   // then get the natural BSA from the source bind source else it is a master bind source then get the normal BSA.
   if IsDetailBS and not MasterPropertyName.IsEmpty then
+  begin
+    // If the master presenter has not created its adapter yet, exit cleanly.
+    // ForceDetailAdaptersCreation (called by the master's own _CreateAdapter) will invoke
+    // CheckAdapter(True) on us once the master adapter is ready, at which point this
+    // guard will no longer block and we will proceed normally.
+    if not Assigned(MasterBindSource) or not MasterBindSource.HasActiveAdapter then
+      Exit;
     SetActiveBindSourceAdapter(TioLiveBindingsFactory.GetDetailBSAfromMasterBindSource(nil, Name, MasterBindSource, MasterPropertyName))
+  end
   else if IsFromBSLoadType or (IsDetailBS and MasterPropertyName.IsEmpty) then
     SetActiveBindSourceAdapter(TioLiveBindingsFactory.GetNaturalBSAfromMasterBindSource(nil, Name, MasterBindSource))
   else
@@ -1531,7 +1584,7 @@ begin
     SetActiveBindSourceAdapter(TioLiveBindingsFactory.GetBSA(nil, Name, TypeName, TypeAlias, Where, TypeOfCollection, ADataObject, AOwnsObject));
     // Force the creation of all the detail adapters (if exists)
     // NB: Per risolvere alcuni problemi di sequenza (tipo le condizioni in WhereStr di dettaglio che non
-    // funzionavano perchè al momento di apertura del MasterAdapter i DetailAdapters non erano ancora nemmeno
+    // funzionavano perchï¿½ al momento di apertura del MasterAdapter i DetailAdapters non erano ancora nemmeno
     // stati creati) forzo la creazione anche di tutti gli adapters di dettaglio al momento della creazione
     // del Master.
     ForceDetailAdaptersCreation;
@@ -1551,8 +1604,8 @@ begin
   if CheckAdapter then
   begin
     GetActiveBindSourceAdapter.Insert(AObject);
-    // NB: HO commentato la riga sotto perchè Marco Mottadelli mi ha segnalato che causava
-    // il fatto che lo stato del componente passava subito a "Browse" perchè veniva
+    // NB: HO commentato la riga sotto perchï¿½ Marco Mottadelli mi ha segnalato che causava
+    // il fatto che lo stato del componente passava subito a "Browse" perchï¿½ veniva
     // invocato un Post in seguito al Refresh stesso.
     // BindSourceAdapter.Refresh(False);
   end;

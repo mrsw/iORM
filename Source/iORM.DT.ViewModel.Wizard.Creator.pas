@@ -101,11 +101,7 @@ end;
 
 function TioViewModelWizardCreator.GetAncestorName: string;
 begin
-  // If the name starts with "T" character (class) then skip the first char
-  if FAncestorName.StartsWith('T') then
-    Result := Copy(FAncestorName, 2, Length(FAncestorName))
-  else
-    Result := FAncestorName;
+  Result := 'DataModule';
 end;
 
 function TioViewModelWizardCreator.GetCreatorType: string;

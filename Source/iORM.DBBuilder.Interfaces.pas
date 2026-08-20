@@ -373,12 +373,13 @@ type
     /// <param name="AScript">The script where sql instructions will be returned.</param>
     /// </summary>
     procedure BuildUpdateDBSqlScript(const AScript: IioDBBuilderSqlScript);
+    procedure CreateDB(const Force: Boolean = False; const ASQLScript: TStrings = nil);
     /// <summary>
     ///  Creates or update the database depending on the actual schema/database status.
     ///  No need to call Analyze because it is called internally.
     /// <param name="Force">Forces the execution regardless of the schema status.</param>
     /// </summary>
-    procedure CreateOrUpdateDB(const Force: Boolean = False; const AScript: IioDBBuilderSqlScript = nil);
+    procedure CreateOrUpdateDB(const Force: Boolean = False);
     /// <summary>
     ///  Creates or update the the table depending on the actual schema status.
     /// <param name="ATable">Schema of the table to be created/updated.</param>
@@ -395,6 +396,7 @@ type
     /// </summary>
     procedure CreateTable(const ATable: IioDBBuilderSchemaTable; const AddIndexes: Boolean = True;
       const AddForeignKeys: Boolean = True);
+    procedure UpdateDB(const Force: Boolean = False; const ASQLScript: TStrings = nil);
     /// <summary>
     ///  Updates the table using the schema passed.
     /// <param name="ATable">Schema of the table to be created/updated.</param>
