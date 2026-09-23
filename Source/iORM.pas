@@ -49,7 +49,7 @@ uses
   iORM.Context.Interfaces, iORM.SynchroStrategy.Interfaces;
 
 const
-  IORM_VERSION = 'iORM 2 (beta 3.4)';
+  IORM_VERSION = 'iORM 2 (beta 3.4)+mrsw.29';
 
 {$REGION 'Value aliases to make sure you have to include fewer units (in practice only the iORM unit) in the "uses" part of the units that use iORM'}
   // NULL value constants
@@ -2310,11 +2310,11 @@ end;
 initialization
 
   // Initialize the dependency injection container
-  // NB: Crea semplicemente il dictionary, la registrazione delle classi avviene più sotto chiamando TioMapContainer.Build
+  // NB: Crea semplicemente il dictionary, la registrazione delle classi avviene piï¿½ sotto chiamando TioMapContainer.Build
   TioDependencyInjectionContainer.Build;
 
   // Register as default DuckTypedStreamObject invoker
-  // NB: L'ho messo qui perchè altrimenti nella unit dove è dichiarata la classe non
+  // NB: L'ho messo qui perchï¿½ altrimenti nella unit dove ï¿½ dichiarata la classe non
   // venive eseguito
   // NB:  Evita un AV error probabilmente causato dal fatto che i vari containers della parte ORM non sono ancora a posto
   io.di.RegisterClass<TioDuckTypedStreamObject>.Implements<IioDuckTypedStreamObject>.DisableMapImplemetersRef.Execute;
