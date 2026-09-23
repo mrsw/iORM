@@ -72,6 +72,14 @@ begin
     FScriptComponent.Connection := AConnection.AsDBConnection.GetConnection
   else
     raise EioGenericException.Create(ClassName, 'Create', '"AConnection" parameter must be a DB connection type');
+
+  // TFDScript.ScriptOptions.BreakOnError defaults to False: without this, a failing
+  // statement (e.g. an invalid CREATE INDEX) is silently skipped and the script keeps
+  // going, committing whatever succeeded as if the whole script had worked. Verified
+  // with a real schema-update script containing a single failing CREATE INDEX: it
+  // logged the exception internally but ExecuteScript still returned normally and
+  // Execute below reported success (see TotalErrors check for the same reason).
+  FScriptComponent.ScriptOptions.BreakOnError := True;
 end;
 
 destructor TioScript.Destroy;
@@ -88,6 +96,14 @@ begin
   FConnectionComponent.StartTransaction;
   try
     FScriptComponent.ExecuteScript(FScript);
+
+    // Defense in depth alongside ScriptOptions.BreakOnError (set in Create): raise
+    // explicitly if any statement failed, instead of trusting that ExecuteScript
+    // always propagates the failure as an exception.
+    if FScriptComponent.TotalErrors > 0 then
+      raise EioGenericException.Create(ClassName, 'Execute',
+        Format('Script execution failed with %d error(s).', [FScriptComponent.TotalErrors]));
+
     FConnectionComponent.Commit;
     Result := True;
   except
