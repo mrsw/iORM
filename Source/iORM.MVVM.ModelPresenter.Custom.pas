@@ -526,8 +526,14 @@ begin
   if Assigned(FETMFor) then
     FETMfor.UnregisterDetailBindSource(Self);
   // Destroy the BindSourceAdapter was created then destroy it
-  if CheckAdapter and not(csDestroying in TComponent(FBindSourceAdapter).ComponentState) then
-    FBindSourceAdapter.Free;
+  if CheckAdapter then
+  begin
+    if not(csDestroying in TComponent(FBindSourceAdapter).ComponentState) then
+      FBindSourceAdapter.Free;
+    // The adapter is (being) destroyed: forget the interface without releasing it, otherwise the compiler generated
+    //  cleanup of the instance would call _Release on a freed object (random access violation).
+    Pointer(FBindSourceAdapter) := nil;
+  end;
   // Collezione alla quale i ModelBindSource/ModelDataSet si registrano per rendere nota
   // la loro presenza e rendere possibile l'attivazione/disattivazione di se stessi da
   // parte del ModelPresenter al quale sono collegati
