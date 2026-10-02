@@ -49,7 +49,7 @@ uses
   iORM.Context.Interfaces, iORM.SynchroStrategy.Interfaces;
 
 const
-  IORM_VERSION = 'iORM 2 (beta 3.4)+mrsw.29';
+  IORM_VERSION = 'iORM 2 (beta 3.4)+mrsw.30';
 
 {$REGION 'Value aliases to make sure you have to include fewer units (in practice only the iORM unit) in the "uses" part of the units that use iORM'}
   // NULL value constants

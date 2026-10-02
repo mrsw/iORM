@@ -958,6 +958,9 @@ begin
   if Assigned(FETMfor) and (AComponent = (FETMFor as TComponent)) then
     ETMFor := nil;
 
+  if Assigned(FSelectorFor) and (AComponent = (FSelectorFor as TComponent)) then
+    SelectorFor := nil;
+
 end;
 
 procedure TioModelPresenterCustom.Notify(const Sender: TObject; const [Ref] ANotification: TioBSNotification);
