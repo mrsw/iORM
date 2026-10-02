@@ -47,6 +47,7 @@ type
     FSourceAdapter: IioNaturalBindSourceAdapterSource;
     procedure SynchronizeSourceAdapter;
   protected
+    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     procedure DoBeforeOpen; override;
     procedure DoBeforeDelete; override;
     procedure DoAfterDelete; override;
@@ -80,6 +81,9 @@ begin
                    False
                   );
   FSourceAdapter := ASourceAdapter;
+  // The source adapter (usually the one of a list) is not owned by this adapter and can be destroyed before it:
+  //  ask to be notified, see Notification.
+  (FSourceAdapter as TComponent).FreeNotification(Self);
 end;
 
 destructor TioNaturalActiveObjectBindSourceAdapter.Destroy;
@@ -89,6 +93,8 @@ begin
   // Unregister itself from the SourceBS.DetailAdaptersContainer
   if Assigned(FSourceAdapter) and Assigned(FSourceAdapter.DetailAdaptersContainer) then
     FSourceAdapter.DetailAdaptersContainer.RemoveNaturalBindSourceAdapter(Self);
+  if Assigned(FSourceAdapter) then
+    (FSourceAdapter as TComponent).RemoveFreeNotification(Self);
   // If the LoadType is ltFromBSReloadNewInstance and it is inherited from TioActiveObjectBindSourceAdapter
   //  (it is'n an interfaced bind source) then free che DataObject (owns it)
   FLoadType := (Self as IioActiveBindSourceAdapter).LoadType;
@@ -199,6 +205,15 @@ function TioNaturalActiveObjectBindSourceAdapter.GetAutoLoad: Boolean;
 begin
   // NaturalBindSourceAdapter is always a not AutoLoad adapter by definition
   Result := False;
+end;
+
+procedure TioNaturalActiveObjectBindSourceAdapter.Notification(AComponent: TComponent; Operation: TOperation);
+begin
+  inherited;
+  // If the source adapter is destroyed before this adapter (e.g. the list view is closed before the view that shows
+  //  the selected object) forget it, otherwise it would be accessed (destructor, notifications...) after being freed.
+  if (Operation = opRemove) and Assigned(FSourceAdapter) and (AComponent = (FSourceAdapter as TComponent)) then
+    FSourceAdapter := nil;
 end;
 
 function TioNaturalActiveObjectBindSourceAdapter.NotifyButDontForwardNotificationToSourceAdapter(const Sender: TObject; const [Ref] ANotification: TioBSNotification): Boolean;

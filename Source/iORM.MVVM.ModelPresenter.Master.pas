@@ -83,6 +83,8 @@ type
     function GetOnRecordChangeAction: TioBSOnRecordChangeAction;
     procedure SetOnRecordChangeAction(const Value: TioBSOnRecordChangeAction);
   protected
+    // TComponent       Carlo Marona (2026-02-05)
+    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     function PostPonedActivation_CanOpen(const ANewDataObject: TObject): Boolean;
     procedure _CreateAdapter(const ADataObject: TObject; const AOwnsObject: Boolean); override;
     procedure SetActive(const Value: Boolean); override;
@@ -250,6 +252,14 @@ begin
   Result := True;
 end;
 
+procedure TioModelPresenterMaster.Notification(AComponent: TComponent; Operation: TOperation);
+begin
+  inherited;
+
+  if Assigned(FWhereBuilderFor) and (AComponent = (FWhereBuilderFor as TComponent)) then
+    WhereBuilderFor := nil;
+end;
+
 procedure TioModelPresenterMaster.Open;
 begin
   inherited;
@@ -305,7 +315,17 @@ end;
 
 procedure TioModelPresenterMaster.SetWhereBuilderFor(const AMasterBS: IioMasterBindSource);
 begin
+  // Carlo Marona (2026-02-05)
+  // Remove free notification for WhereBuilderFor
+  if Assigned(FWhereBuilderFor) then
+    RemoveFreeNotification(FWhereBuilderFor as TComponent);
+
   FWhereBuilderFor := AMasterBS;
+
+  // Carlo Marona (2026-02-05)
+  // Register for free notification of WhereBuilderFor
+  if Assigned(FWhereBuilderFor) then
+    FreeNotification(FWhereBuilderFor as TComponent);
 end;
 
 function TioModelPresenterMaster.BuildWhere(const AExecuteOnTarget: Boolean): IioWhere;

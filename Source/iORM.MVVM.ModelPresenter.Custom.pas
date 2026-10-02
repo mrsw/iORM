@@ -202,6 +202,8 @@ type
     procedure DoAfterOpen;
     procedure DoBeforeClose;
     procedure DoBeforeOpen;
+    // TComponent       Carlo Marona (2026-02-05)
+    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     // MasterPresenter
     procedure SetMasterBindSource(const Value: IioBindSource); virtual;
     // Active
@@ -526,8 +528,14 @@ begin
   if Assigned(FETMFor) then
     FETMfor.UnregisterDetailBindSource(Self);
   // Destroy the BindSourceAdapter was created then destroy it
-  if CheckAdapter and not(csDestroying in TComponent(FBindSourceAdapter).ComponentState) then
-    FBindSourceAdapter.Free;
+  if CheckAdapter then
+  begin
+    if not(csDestroying in TComponent(FBindSourceAdapter).ComponentState) then
+      FBindSourceAdapter.Free;
+    // The adapter is (being) destroyed: forget the interface without releasing it, otherwise the compiler generated
+    //  cleanup of the instance would call _Release on a freed object (random access violation).
+    Pointer(FBindSourceAdapter) := nil;
+  end;
   // Collezione alla quale i ModelBindSource/ModelDataSet si registrano per rendere nota
   // la loro presenza e rendere possibile l'attivazione/disattivazione di se stessi da
   // parte del ModelPresenter al quale sono collegati
@@ -938,6 +946,21 @@ procedure TioModelPresenterCustom.Next;
 begin
   if CheckAdapter then
     GetActiveBindSourceAdapter.Next;
+end;
+
+procedure TioModelPresenterCustom.Notification(AComponent: TComponent; Operation: TOperation);
+begin
+  inherited;
+
+  if Assigned(FMasterBindSource) and (AComponent = (FMasterBindSource as TComponent)) then
+    MasterBindSource := nil;
+
+  if Assigned(FETMfor) and (AComponent = (FETMFor as TComponent)) then
+    ETMFor := nil;
+
+  if Assigned(FSelectorFor) and (AComponent = (FSelectorFor as TComponent)) then
+    SelectorFor := nil;
+
 end;
 
 procedure TioModelPresenterCustom.Notify(const Sender: TObject; const [Ref] ANotification: TioBSNotification);
@@ -1376,7 +1399,21 @@ end;
 
 procedure TioModelPresenterCustom.SetMasterBindSource(const Value: IioBindSource);
 begin
+  // Carlo Marona (2026-02-05)
+  // Remove free notification for the master bind source
+  if Assigned(FMasterBindSource) then
+    RemoveFreeNotification(FMasterBindSource as TComponent);
+
+  if (Value as TComponent) = Self then
+    raise EioMasterBindSourceRecursionException.Create(Self.ClassName, 'SetMasterBindSource',
+      Format('You cannot select "%s" as MasterBindSource of it self.', [Name]));
+
   FMasterBindSource := Value;
+
+  // Carlo Marona (2026-02-05)
+  // Register for free notification of the master bind source
+  if Assigned(FMasterBindSource) then
+    FreeNotification(FMasterBindSource as TComponent);
 end;
 
 procedure TioModelPresenterCustom.SetMasterPropertyName(const Value: String);
@@ -1433,7 +1470,17 @@ end;
 
 procedure TioModelPresenterCustom.SetSelectorFor(const ATargetBindSource: IioBindSource);
 begin
+  // Carlo Marona (2026-02-05)
+  // Remove free notification for the SelectorFor
+  if Assigned(FSelectorFor) then
+    RemoveFreeNotification(FSelectorFor as TComponent);
+
   FSelectorFor := ATargetBindSource;
+
+  // Carlo Marona (2026-02-05)
+  // Register for free notification of the SelectorFor
+  if Assigned(FSelectorFor) then
+    FreeNotification(FSelectorFor as TComponent);
 end;
 
 procedure TioModelPresenterCustom.SetTypeAlias(const Value: String);
@@ -1596,7 +1643,17 @@ end;
 
 procedure TioModelPresenterCustom._InternalSetETMforPrivateField(const AETMFor: IioBindSource);
 begin
+  // Carlo Marona (2026-02-05)
+  // Remove free notification for the ETMFor
+  if Assigned(FETMFor) then
+    RemoveFreeNotification(FETMFor as TComponent);
+
   FETMfor := AETMfor as IioMasterBindSource;
+
+  // Carlo Marona (2026-02-05)
+  // Register for free notification of the ETMFor
+  if Assigned(FETMFor) then
+    FreeNotification(FETMFor as TComponent);
 end;
 
 procedure TioModelPresenterCustom.Insert(AObject: IInterface);
